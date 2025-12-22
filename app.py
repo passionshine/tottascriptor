@@ -192,35 +192,43 @@ if st.session_state.search_results:
 
     st.markdown(f"**현재 필터 결과: {len(display_results)}건**")
     
-    for i, res in enumerate(display_results):
+for i, res in enumerate(display_results):
         with st.container():
-            # [레이아웃] 제목(왼쪽) + 원문보기 버튼(오른쪽)
-            t_col, b_col = st.columns([0.83, 0.17])
-            with t_col:
+            # [레이아웃] 제목(0.7) + 원문보기(0.1) + 공사보도(0.1) + 유관보도(0.1) = 총 1.0
+            col1, col2, col3, col4 = st.columns([0.7, 0.1, 0.1, 0.1])
+            
+            # 1. 기사 제목 및 메타정보 (70%)
+            with col1:
                 st.markdown(f"""
                 <div class="news-card">
                     <div class="news-title">{res['title']}</div>
                     <div class="news-meta">[{res['press']}] {res['time']}</div>
                 </div>
                 """, unsafe_allow_html=True)
-            with b_col:
-                st.write("") # 수직 정렬 여백
-                st.link_button("🔗 원문보기", res['link'])
             
-            # [레이아웃] 스크랩 버튼 2개
-            s1, s2 = st.columns(2)
-            with s1:
-                if st.button(f"🏢 공사 보도 +", key=f"c_{i}"):
+            # 2. 원문보기 버튼 (10%)
+            with col2:
+                st.write("") # 상단 여백 (제목 높이와 맞춤)
+                st.link_button("🔗 원문", res['link'], help="기사 원문으로 이동")
+            
+            # 3. 공사 보도 스크랩 (10%)
+            with col3:
+                st.write("") 
+                if st.button(f"🏢 공사+", key=f"c_{i}"):
                     item = f"ㅇ {res['title']}_{res['press']}\n{res['link']}\n\n"
                     if item not in st.session_state.corp_list:
                         st.session_state.corp_list.append(item)
-                        st.toast("✅ 공사 섹션 추가 완료!", icon="🏢")
+                        st.toast("✅ 공사 섹션 추가!", icon="🏢")
                         st.rerun()
-            with s2:
-                if st.button(f"🚆 유관기관 보도 +", key=f"r_{i}"):
+            
+            # 4. 유관기관 스크랩 (10%)
+            with col4:
+                st.write("") 
+                if st.button(f"🚆 유관+", key=f"r_{i}"):
                     item = f"ㅇ {res['title']}_{res['press']}\n{res['link']}\n\n"
                     if item not in st.session_state.rel_list:
                         st.session_state.rel_list.append(item)
-                        st.toast("✅ 유관기관 섹션 추가 완료!", icon="🚆")
+                        st.toast("✅ 유관기관 추가!", icon="🚆")
                         st.rerun()
+        
         st.write("---")
