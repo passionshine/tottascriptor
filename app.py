@@ -135,10 +135,10 @@ for key in ['corp_list', 'rel_list', 'search_results']:
 t_date = get_target_date()
 date_header = f"<{t_date.month}월 {t_date.day}일({['월','화','수','목','금','토','일'][t_date.weekday()]}) 조간 스크랩>"
 
-st.title("🚇 조간 뉴스 스크랩")
+st.title("🚇 또타 스크립터")
 
 # 1. 결과 상단 영역 (스크랩 텍스트 생성)
-st.subheader("📋 스크랩 결과 리스트")
+st.subheader("📋 스크랩 결과")
 final_output = f"{date_header}\n\n[공사 관련 보도]\n"
 final_output += "".join(st.session_state.corp_list) if st.session_state.corp_list else "(내용 없음)\n"
 final_output += "\n[철도 등 기타 유관기관 관련 보도]\n"
