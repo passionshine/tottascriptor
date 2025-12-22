@@ -214,7 +214,7 @@ for i, res in enumerate(display_results):
             # 3. 공사 보도 스크랩 (10%)
             with col3:
                 st.write("") 
-                if st.button(f"🏢 공사보도", key=f"c_{i}", help="공사 관련보도 스크랩"):
+                if st.button(f"공사보도", key=f"c_{i}", help="공사 관련보도 스크랩"):
                     item = f"ㅇ {res['title']}_{res['press']}\n{res['link']}\n\n"
                     if item not in st.session_state.corp_list:
                         st.session_state.corp_list.append(item)
@@ -224,7 +224,7 @@ for i, res in enumerate(display_results):
             # 4. 유관기관 스크랩 (10%)
             with col4:
                 st.write("") 
-                if st.button(f"🚆 유관보도", key=f"r_{i}", help="유관기관 관련보도 스크랩"):
+                if st.button(f"유관보도", key=f"r_{i}", help="유관기관 관련보도 스크랩"):
                     item = f"ㅇ {res['title']}_{res['press']}\n{res['link']}\n\n"
                     if item not in st.session_state.rel_list:
                         st.session_state.rel_list.append(item)
