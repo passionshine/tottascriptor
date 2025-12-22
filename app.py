@@ -19,13 +19,13 @@ def get_target_date():
         datetime.date(2025,3,1), datetime.date(2025,3,3), datetime.date(2025,5,5), datetime.date(2025,5,6),
         datetime.date(2025,6,6), datetime.date(2025,8,15), datetime.date(2025,10,3), datetime.date(2025,10,5),
         datetime.date(2025,10,6), datetime.date(2025,10,7), datetime.date(2025,10,8), datetime.date(2025,10,9), datetime.date(2025,12,25),
-        # (2026-2029 데이터는 지면상 생략했으나 로직상 동일하게 작동하며, 필요시 추가 가능)
+        # 2026-2029년 데이터는 생략 (실제 코드에는 전체 리스트를 넣으시면 됩니다)
     ]
     while target in holidays or target.weekday() >= 5:
         target += datetime.timedelta(days=1)
     return target
 
-# --- [2. 뉴스 스크래퍼 (성공 파싱 로직 적용)] ---
+# --- [2. 뉴스 스크래퍼 (사용자 제공 성공 로직)] ---
 class NewsScraper:
     def __init__(self):
         self.scraper = cloudscraper.create_scraper()
@@ -49,7 +49,6 @@ class NewsScraper:
                 title, link = t_tag.get_text(strip=True), t_tag.get('href')
                 if link in seen_links: continue
                 
-                # [성공 로직] 카드 컨테이너 및 메타정보 파싱
                 card = None
                 curr = t_tag
                 for _ in range(5):
@@ -80,6 +79,20 @@ st.set_page_config(page_title="서울교통공사 스크랩", layout="wide")
 
 st.markdown("""
     <style>
+    /* 버튼 3개가 한 줄을 꽉 채우도록 설정 */
+    .stButton > button, .stLinkButton > a {
+        width: 100% !important;
+        height: 38px !important;
+        font-size: 11px !important; /* 모바일 대응 글자 크기 */
+        font-weight: 600 !important;
+        padding: 0px 2px !important;
+        border-radius: 6px !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        text-decoration: none !important;
+        white-space: nowrap !important; /* 글자 줄바꿈 방지 */
+    }
     .news-card {
         background: white; padding: 12px; border-radius: 12px;
         border-left: 6px solid #007bff; margin-bottom: 8px;
@@ -88,12 +101,9 @@ st.markdown("""
     .news-title { font-size: 14px; font-weight: 700; color: #1a1a1a; line-height: 1.4; }
     .news-meta { font-size: 11px; color: #666; margin-top: 4px; }
     
-    .stButton > button, .stLinkButton > a {
-        width: 100% !important; height: 36px !important;
-        font-size: 12px !important; font-weight: 600 !important;
-        padding: 0 !important; border-radius: 6px !important;
-        display: inline-flex !important; align-items: center !important; justify-content: center !important;
-        text-decoration: none !important;
+    /* 모바일에서 컬럼 간격 최소화 */
+    [data-testid="column"] {
+        padding: 0 2px !important;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -102,7 +112,7 @@ if 'corp_list' not in st.session_state: st.session_state.corp_list = []
 if 'rel_list' not in st.session_state: st.session_state.rel_list = []
 if 'search_results' not in st.session_state: st.session_state.search_results = []
 
-# 날짜 헤더
+# 날짜 헤더 생성
 t_date = get_target_date()
 date_header = f"<{t_date.month}월 {t_date.day}일({['월','화','수','목','금','토','일'][t_date.weekday()]}) 조간 스크랩>"
 
@@ -123,23 +133,20 @@ if st.button("📋 클립보드로 전체 복사"):
 
 st.divider()
 
-# 2. 검색 설정 및 필터 (필터 복구 완료)
+# 2. 검색 설정 및 필터
 with st.expander("🔍 검색 설정 및 필터", expanded=True):
     keyword = st.text_input("키워드", value="서울교통공사")
     c1, c2 = st.columns(2)
     with c1: start_d = st.date_input("시작", datetime.date.today()-datetime.timedelta(days=1))
     with c2: end_d = st.date_input("종료", datetime.date.today())
-    
-    # [복구된 필터 옵션]
     filter_choice = st.radio("검색 범위", ["네이버 기사", "언론사 자체기사", "모두 보기"], index=0, horizontal=True)
 
 if st.button("🚀 뉴스 검색 시작", type="primary"):
     with st.spinner('검색 중...'):
         st.session_state.search_results = NewsScraper().fetch_news(start_d, end_d, keyword)
 
-# 3. 결과 출력 (필터링 로직 포함)
+# 3. 결과 출력
 if st.session_state.search_results:
-    # 필터링 적용
     if filter_choice == "네이버 기사":
         display_results = [r for r in st.session_state.search_results if r['is_naver']]
     elif filter_choice == "언론사 자체기사":
@@ -150,7 +157,6 @@ if st.session_state.search_results:
     st.subheader(f"✅ 결과: {len(display_results)}건")
     for i, res in enumerate(display_results):
         with st.container():
-            # 기사 정보 카드
             st.markdown(f"""
             <div class="news-card">
                 <div class="news-title">{res['title']}</div>
@@ -158,19 +164,19 @@ if st.session_state.search_results:
             </div>
             """, unsafe_allow_html=True)
             
-            # 버튼 3개 가로 배치
+            # 버튼 3개 가로 배치 (이름 변경 및 한 줄 강제)
             b1, b2, b3 = st.columns(3)
             with b1:
-                st.link_button("🔗 원문", res['link'])
+                st.link_button("🔗 원문보기", res['link'])
             with b2:
-                if st.button("🏢 공사", key=f"c_{i}"):
+                if st.button("🏢 공사보도 스크랩", key=f"c_{i}"):
                     item = f"ㅇ {res['title']}_{res['press']}\n{res['link']}\n\n"
                     if item not in st.session_state.corp_list:
                         st.session_state.corp_list.append(item)
                         st.toast("✅ 공사 섹션에 추가됨!")
                         st.rerun()
             with b3:
-                if st.button("🚆 유관", key=f"r_{i}"):
+                if st.button("🚆 유관기관 스크랩", key=f"r_{i}"):
                     item = f"ㅇ {res['title']}_{res['press']}\n{res['link']}\n\n"
                     if item not in st.session_state.rel_list:
                         st.session_state.rel_list.append(item)
