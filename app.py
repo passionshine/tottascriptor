@@ -5,15 +5,14 @@ import datetime
 import time
 import streamlit.components.v1 as components
 
-# --- [1. 스마트 날짜 계산 함수 (2025-2029 공휴일 반영)] ---
+# --- [1. 스마트 날짜 계산 함수] ---
 def get_target_date():
     today = datetime.date.today()
-    if today.weekday() == 4: target = today + datetime.timedelta(days=3) # 금->월
-    elif today.weekday() == 5: target = today + datetime.timedelta(days=2) # 토->월
+    if today.weekday() == 4: target = today + datetime.timedelta(days=3)
+    elif today.weekday() == 5: target = today + datetime.timedelta(days=2)
     else: target = today + datetime.timedelta(days=1)
 
     holidays = [
-        # 2025년 (2025년 기준 캘린더 반영)
         datetime.date(2025,1,1), datetime.date(2025,1,28), datetime.date(2025,1,29), datetime.date(2025,1,30),
         datetime.date(2025,3,1), datetime.date(2025,3,3), datetime.date(2025,5,5), datetime.date(2025,5,6),
         datetime.date(2025,6,6), datetime.date(2025,8,15), datetime.date(2025,10,3), datetime.date(2025,10,5),
@@ -77,13 +76,13 @@ st.set_page_config(page_title="서울교통공사 스크랩", layout="wide")
 
 st.markdown("""
     <style>
-    /* 버튼 스타일 통일 */
+    /* 버튼 스타일: 3개가 한 줄에 들어가도록 최적화 */
     .stButton > button, .stLinkButton > a {
         width: 100% !important;
-        height: 36px !important;
-        font-size: 11px !important;
+        height: 34px !important;
+        font-size: 10.5px !important; /* 3개 버튼을 위해 약간 축소 */
         font-weight: 600 !important;
-        padding: 0px 5px !important;
+        padding: 0px 2px !important;
         border-radius: 6px !important;
         display: inline-flex !important;
         align-items: center !important;
@@ -91,17 +90,25 @@ st.markdown("""
         text-decoration: none !important;
         white-space: nowrap !important;
     }
-    /* 뉴스 카드 디자인 */
+    
+    /* 뉴스 카드: 제목이 끝까지 나오도록 설정 */
     .news-card {
         background: white; padding: 12px; border-radius: 12px;
-        border-left: 6px solid #007bff; margin-bottom: 2px;
+        border-left: 6px solid #007bff; margin-bottom: 6px;
         box-shadow: 0 2px 5px rgba(0,0,0,0.05);
     }
-    /* 요청사항: 글씨 크기 1씩 상향 (14->15, 11->12) */
-    .news-title { font-size: 15px !important; font-weight: 700; color: #1a1a1a; line-height: 1.3; }
-    .news-meta { font-size: 12px !important; color: #666; margin-top: 4px; }
+    .news-title { 
+        font-size: 15px !important; 
+        font-weight: 700; 
+        color: #1a1a1a; 
+        line-height: 1.4;
+        word-break: keep-all; /* 단어 단위 줄바꿈으로 가독성 향상 */
+        white-space: normal !important; /* 제목이 길어도 다음 줄로 전체 표시 */
+    }
+    .news-meta { font-size: 12px !important; color: #666; margin-top: 5px; }
     
-    [data-testid="column"] { padding: 0 2px !important; }
+    /* 컬럼 간격 최소화 */
+    [data-testid="column"] { padding: 0 3px !important; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -121,7 +128,7 @@ final_output += "".join(st.session_state.corp_list) if st.session_state.corp_lis
 final_output += "\n[철도 등 기타 유관기관 관련 보도]\n"
 final_output += "".join(st.session_state.rel_list) if st.session_state.rel_list else "(내용 없음)\n"
 
-st.text_area("전체 텍스트", value=final_output, height=250, label_visibility="collapsed")
+st.text_area("전체 텍스트", value=final_output, height=200, label_visibility="collapsed")
 
 if st.button("📋 클립보드로 전체 복사"):
     st.toast("📋 전체 내용이 클립보드에 복사되었습니다!")
@@ -143,45 +150,39 @@ if st.button("🚀 뉴스 검색 시작", type="primary"):
 
 # 3. 결과 출력
 if st.session_state.search_results:
+    display_results = st.session_state.search_results
     if filter_choice == "네이버 기사":
-        display_results = [r for r in st.session_state.search_results if r['is_naver']]
+        display_results = [r for r in display_results if r['is_naver']]
     elif filter_choice == "언론사 자체기사":
-        display_results = [r for r in st.session_state.search_results if not r['is_naver']]
-    else:
-        display_results = st.session_state.search_results
+        display_results = [r for r in display_results if not r['is_naver']]
 
     st.subheader(f"✅ 결과: {len(display_results)}건")
     for i, res in enumerate(display_results):
-        # 기사 카드 영역
         with st.container():
-            # 상단: 제목/메타데이터와 원문보기 버튼을 한 줄에 배치 (8:2 비율)
-            row1_col1, row1_col2 = st.columns([0.8, 0.22])
-            with row1_col1:
-                st.markdown(f"""
-                <div class="news-card">
-                    <div class="news-title">{res['title']}</div>
-                    <div class="news-meta">[{res['press']}] {res['time']} {'(네이버)' if res['is_naver'] else ''}</div>
-                </div>
-                """, unsafe_allow_html=True)
-            with row1_col2:
-                # 제목 높이에 맞춰 여백 추가 후 버튼 배치
-                st.write("") 
-                st.link_button("🔗 원문보기", res['link'])
+            # 1. 기사 제목 및 메타데이터 (전체 너비 사용)
+            st.markdown(f"""
+            <div class="news-card">
+                <div class="news-title">{res['title']}</div>
+                <div class="news-meta">[{res['press']}] {res['time']} {'(네이버)' if res['is_naver'] else ''}</div>
+            </div>
+            """, unsafe_allow_html=True)
             
-            # 하단: 스크랩 버튼 2개 배치
-            row2_col1, row2_col2 = st.columns(2)
-            with row2_col1:
-                if st.button("🏢 공사보도 스크랩", key=f"c_{i}"):
+            # 2. 버튼 3개 한 줄 배치
+            b1, b2, b3 = st.columns([1, 1, 1])
+            with b1:
+                st.link_button("🔗 원문보기", res['link'])
+            with b2:
+                if st.button("🏢 공사 보도 +", key=f"c_{i}"):
                     item = f"ㅇ {res['title']}_{res['press']}\n{res['link']}\n\n"
                     if item not in st.session_state.corp_list:
                         st.session_state.corp_list.append(item)
-                        st.toast("✅ 공사 섹션에 추가됨!")
+                        st.toast("✅ 공사 섹션 추가!")
                         st.rerun()
-            with row2_col2:
-                if st.button("🚆 유관기관 스크랩", key=f"r_{i}"):
+            with b3:
+                if st.button("🚆 유관기관 보도 +", key=f"r_{i}"):
                     item = f"ㅇ {res['title']}_{res['press']}\n{res['link']}\n\n"
                     if item not in st.session_state.rel_list:
                         st.session_state.rel_list.append(item)
-                        st.toast("✅ 유관 섹션에 추가됨!")
+                        st.toast("✅ 유관 섹션 추가!")
                         st.rerun()
-        st.write("---")
+        st.write("") # 간격 조절
