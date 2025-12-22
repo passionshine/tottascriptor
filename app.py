@@ -12,20 +12,18 @@ def get_target_date():
     elif today.weekday() == 5: target = today + datetime.timedelta(days=2) # 토->월
     else: target = today + datetime.timedelta(days=1)
 
-    # 2025-2029 주요 공휴일 및 대체휴일 리스트
     holidays = [
-        # 2025년
+        # 2025년 (2025년 기준 캘린더 반영)
         datetime.date(2025,1,1), datetime.date(2025,1,28), datetime.date(2025,1,29), datetime.date(2025,1,30),
         datetime.date(2025,3,1), datetime.date(2025,3,3), datetime.date(2025,5,5), datetime.date(2025,5,6),
         datetime.date(2025,6,6), datetime.date(2025,8,15), datetime.date(2025,10,3), datetime.date(2025,10,5),
         datetime.date(2025,10,6), datetime.date(2025,10,7), datetime.date(2025,10,8), datetime.date(2025,10,9), datetime.date(2025,12,25),
-        # 2026-2029년 데이터는 생략 (실제 코드에는 전체 리스트를 넣으시면 됩니다)
     ]
     while target in holidays or target.weekday() >= 5:
         target += datetime.timedelta(days=1)
     return target
 
-# --- [2. 뉴스 스크래퍼 (사용자 제공 성공 로직)] ---
+# --- [2. 뉴스 스크래퍼] ---
 class NewsScraper:
     def __init__(self):
         self.scraper = cloudscraper.create_scraper()
@@ -79,32 +77,31 @@ st.set_page_config(page_title="서울교통공사 스크랩", layout="wide")
 
 st.markdown("""
     <style>
-    /* 버튼 3개가 한 줄을 꽉 채우도록 설정 */
+    /* 버튼 스타일 통일 */
     .stButton > button, .stLinkButton > a {
         width: 100% !important;
-        height: 38px !important;
-        font-size: 11px !important; /* 모바일 대응 글자 크기 */
+        height: 36px !important;
+        font-size: 11px !important;
         font-weight: 600 !important;
-        padding: 0px 2px !important;
+        padding: 0px 5px !important;
         border-radius: 6px !important;
         display: inline-flex !important;
         align-items: center !important;
         justify-content: center !important;
         text-decoration: none !important;
-        white-space: nowrap !important; /* 글자 줄바꿈 방지 */
+        white-space: nowrap !important;
     }
+    /* 뉴스 카드 디자인 */
     .news-card {
         background: white; padding: 12px; border-radius: 12px;
-        border-left: 6px solid #007bff; margin-bottom: 8px;
+        border-left: 6px solid #007bff; margin-bottom: 2px;
         box-shadow: 0 2px 5px rgba(0,0,0,0.05);
     }
-    .news-title { font-size: 14px; font-weight: 700; color: #1a1a1a; line-height: 1.4; }
-    .news-meta { font-size: 11px; color: #666; margin-top: 4px; }
+    /* 요청사항: 글씨 크기 1씩 상향 (14->15, 11->12) */
+    .news-title { font-size: 15px !important; font-weight: 700; color: #1a1a1a; line-height: 1.3; }
+    .news-meta { font-size: 12px !important; color: #666; margin-top: 4px; }
     
-    /* 모바일에서 컬럼 간격 최소화 */
-    [data-testid="column"] {
-        padding: 0 2px !important;
-    }
+    [data-testid="column"] { padding: 0 2px !important; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -112,7 +109,6 @@ if 'corp_list' not in st.session_state: st.session_state.corp_list = []
 if 'rel_list' not in st.session_state: st.session_state.rel_list = []
 if 'search_results' not in st.session_state: st.session_state.search_results = []
 
-# 날짜 헤더 생성
 t_date = get_target_date()
 date_header = f"<{t_date.month}월 {t_date.day}일({['월','화','수','목','금','토','일'][t_date.weekday()]}) 조간 스크랩>"
 
@@ -133,7 +129,7 @@ if st.button("📋 클립보드로 전체 복사"):
 
 st.divider()
 
-# 2. 검색 설정 및 필터
+# 2. 검색 설정
 with st.expander("🔍 검색 설정 및 필터", expanded=True):
     keyword = st.text_input("키워드", value="서울교통공사")
     c1, c2 = st.columns(2)
@@ -156,29 +152,36 @@ if st.session_state.search_results:
 
     st.subheader(f"✅ 결과: {len(display_results)}건")
     for i, res in enumerate(display_results):
+        # 기사 카드 영역
         with st.container():
-            st.markdown(f"""
-            <div class="news-card">
-                <div class="news-title">{res['title']}</div>
-                <div class="news-meta">[{res['press']}] {res['time']} {'(네이버)' if res['is_naver'] else ''}</div>
-            </div>
-            """, unsafe_allow_html=True)
-            
-            # 버튼 3개 가로 배치 (이름 변경 및 한 줄 강제)
-            b1, b2, b3 = st.columns(3)
-            with b1:
+            # 상단: 제목/메타데이터와 원문보기 버튼을 한 줄에 배치 (8:2 비율)
+            row1_col1, row1_col2 = st.columns([0.8, 0.22])
+            with row1_col1:
+                st.markdown(f"""
+                <div class="news-card">
+                    <div class="news-title">{res['title']}</div>
+                    <div class="news-meta">[{res['press']}] {res['time']} {'(네이버)' if res['is_naver'] else ''}</div>
+                </div>
+                """, unsafe_allow_html=True)
+            with row1_col2:
+                # 제목 높이에 맞춰 여백 추가 후 버튼 배치
+                st.write("") 
                 st.link_button("🔗 원문보기", res['link'])
-            with b2:
+            
+            # 하단: 스크랩 버튼 2개 배치
+            row2_col1, row2_col2 = st.columns(2)
+            with row2_col1:
                 if st.button("🏢 공사보도 스크랩", key=f"c_{i}"):
                     item = f"ㅇ {res['title']}_{res['press']}\n{res['link']}\n\n"
                     if item not in st.session_state.corp_list:
                         st.session_state.corp_list.append(item)
                         st.toast("✅ 공사 섹션에 추가됨!")
                         st.rerun()
-            with b3:
+            with row2_col2:
                 if st.button("🚆 유관기관 스크랩", key=f"r_{i}"):
                     item = f"ㅇ {res['title']}_{res['press']}\n{res['link']}\n\n"
                     if item not in st.session_state.rel_list:
                         st.session_state.rel_list.append(item)
                         st.toast("✅ 유관 섹션에 추가됨!")
                         st.rerun()
+        st.write("---")
