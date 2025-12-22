@@ -1,4 +1,4 @@
 streamlit
 cloudscraper
 beautifulsoup4
-pandas
+google-generativeai
