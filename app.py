@@ -181,7 +181,14 @@ st.title("🚇 Totta Scriptor for web")
 
 # 1. 결과 출력 영역
 t_date = get_target_date()
-date_header = f"<{t_date.month}월 {t_date.day}일 조간 스크랩>"
+weekdays = ["월", "화", "수", "목", "금", "토", "일"]
+w_str = weekdays[t_date.weekday()]
+
+# 출력 예시: <12월 23일(화) 조간 스크랩>
+date_header = f"<{t_date.month}월 {t_date.day}일({w_str}) 조간 스크랩>"
+
+
+
 
 final_output = f"{date_header}\n\n[공사 관련 보도]\n" + "".join(st.session_state.corp_list) + "\n[유관기관 관련 보도]\n" + "".join(st.session_state.rel_list)
 text_height = max(150, (final_output.count('\n') + 1) * 22)
@@ -267,4 +274,5 @@ if st.session_state.search_results:
     if p_news: display_list("📰 지면 보도", p_news, "p")
     if n_news: display_list("🟢 네이버 뉴스", n_news, "n")
     if o_news: display_list("🌐 기타 뉴스", o_news, "o")
+
 
