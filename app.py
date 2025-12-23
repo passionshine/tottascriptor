@@ -227,7 +227,7 @@ def display_list(title, items, key_p):
         d_str_display = f"[{d_val}] " if d_val else ""
         
         # [수정] 스크랩 결과 텍스트에는 날짜를 제외함
-        item_txt = f"ㅇ {res['title']}_{res['press']}\n    {res['link']}\n\n"
+        item_txt = f"ㅇ {res['title']}_{res['press']}\n  {res['link']}\n\n"
         
         is_scraped = (item_txt in st.session_state.corp_list) or (item_txt in st.session_state.rel_list)
         bg = "bg-scraped" if is_scraped else ""
@@ -274,6 +274,7 @@ if st.session_state.search_results:
     if p_news: display_list("📰 지면 보도", p_news, "p")
     if n_news: display_list("🟢 네이버 뉴스", n_news, "n")
     if o_news: display_list("🌐 기타 뉴스", o_news, "o")
+
 
 
 
