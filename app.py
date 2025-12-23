@@ -22,7 +22,7 @@ def get_target_date():
         target += datetime.timedelta(days=1)
     return target
 
-# --- [2. 뉴스 스크래퍼] ---
+# --- [2. 뉴스 스크래퍼 (로직 수정됨)] ---
 class NewsScraper:
     def __init__(self):
         self.scraper = cloudscraper.create_scraper()
@@ -45,7 +45,8 @@ class NewsScraper:
             try:
                 res = self.scraper.get(url, headers=self.headers, timeout=10)
                 soup = BeautifulSoup(res.content, 'html.parser')
-                items = soup.select('a[data-heatmap-target=".tit"]')
+                items = soup.select('a[data-heatmap-target=".tit"]') # 제목 링크 선택
+                
                 for t_tag in items:
                     if len(all_results) >= max_articles: break
                     title = t_tag.get('title') if t_tag.get('title') else t_tag.get_text(strip=True)
@@ -53,16 +54,38 @@ class NewsScraper:
                     if link in seen_links: continue
                     seen_links.add(link)
                     
+                    # 정보 추출을 위한 변수 초기화
                     press_name = "알 수 없음"
+                    is_naver = False # 네이버 뉴스 뱃지 유무 확인용
+                    
+                    # 상위 요소(카드)로 올라가면서 언론사명과 '네이버뉴스' 텍스트 찾기
                     card = t_tag
+                    found_press = False
+                    
                     for _ in range(5):
                         if card.parent:
                             card = card.parent
-                            p_el = card.select_one(".sds-comps-profile-info-title-text, .press_name, .info.press")
-                            if p_el: 
-                                press_name = p_el.get_text(strip=True)
-                                break
-                    all_results.append({'title': title, 'link': link, 'press': press_name})
+                            
+                            # 1. 언론사 이름 찾기
+                            if not found_press:
+                                p_el = card.select_one(".sds-comps-profile-info-title-text, .press_name, .info.press")
+                                if p_el: 
+                                    press_name = p_el.get_text(strip=True)
+                                    found_press = True
+                            
+                            # 2. [수정됨] '네이버뉴스' 텍스트/태그 찾기 (사용자 요청 반영)
+                            # 해당 카드 안에 "네이버뉴스"라는 텍스트가 포함된 요소가 있는지 검사
+                            if not is_naver:
+                                # HTML 구조상 텍스트가 존재하면 네이버 뉴스 연동 기사임
+                                if card.find(string="네이버뉴스"): 
+                                    is_naver = True
+
+                    all_results.append({
+                        'title': title, 
+                        'link': link, 
+                        'press': press_name,
+                        'is_naver': is_naver # 판별 결과 저장
+                    })
                 time.sleep(0.1)
             except: break
         return all_results
@@ -260,17 +283,11 @@ def display_news_section(title, articles, section_key):
         
         st.markdown("<hr style='margin: 3px 0; border: none; border-top: 1px solid #f0f0f0;'>", unsafe_allow_html=True)
 
-# 4. 결과 출력 로직 (분류 적용)
+# 4. 결과 출력 로직 (Scraper에서 판별한 is_naver 플래그 사용)
 if st.session_state.search_results:
-    # URL에 'news.naver.com'이 있는지 확인하여 리스트 분리
-    naver_news = [
-        item for item in st.session_state.search_results 
-        if "news.naver.com" in item['link']
-    ]
-    other_news = [
-        item for item in st.session_state.search_results 
-        if "news.naver.com" not in item['link']
-    ]
+    # NewsScraper에서 넘어온 'is_naver' (True/False) 값을 기준으로 분류
+    naver_news = [item for item in st.session_state.search_results if item['is_naver']]
+    other_news = [item for item in st.session_state.search_results if not item['is_naver']]
     
     # 섹션별 출력
     display_news_section("🟢 네이버 뉴스", naver_news, "naver")
