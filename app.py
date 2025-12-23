@@ -23,7 +23,7 @@ def get_target_date():
         target += datetime.timedelta(days=1)
     return target
 
-# --- [2. 뉴스 스크래퍼 (최종 수정: 날짜 선택자 강화)] ---
+# --- [2. 뉴스 스크래퍼 (날짜 파싱 강화 Ver)] ---
 class NewsScraper:
     def __init__(self):
         self.scraper = cloudscraper.create_scraper()
@@ -111,20 +111,30 @@ class NewsScraper:
                         if press_el:
                             press_name = press_el.get_text(strip=True)
                         
-                        # 3. [수정됨] 날짜 및 지면 정보 파싱 (sds-comps-text 클래스 추가)
-                        # span[class*="sds-comps-text"] : 클래스명에 sds-comps-text가 포함된 모든 span 검색
-                        info_spans = card.select(".info, .subtexts span, span[class*='sds-comps-text']")
+                        # 3. [핵심 수정] 날짜 및 지면 정보 파싱 (텍스트 전체 스캔 방식)
+                        # 카드 안의 모든 텍스트를 검사하는 대신, 정보 영역만 타겟팅합니다.
+                        # .info_group: PC/구버전, .sds...: 모바일/신버전
+                        info_areas = card.select(".info_group, .news_info, .sds-comps-profile-info-subtexts, .info")
                         
-                        for span in info_spans:
-                            txt = span.get_text(strip=True)
+                        # 만약 위 영역을 못 찾으면 카드 전체 텍스트에서 찾습니다 (최후의 수단)
+                        if not info_areas:
+                            info_areas = [card]
+
+                        for area in info_areas:
+                            # 영역 내의 텍스트를 추출
+                            area_text = area.get_text(separator=" ", strip=True)
                             
-                            # (A) 날짜 패턴 (1시간 전, 2분 전, 2024.01.01 등)
-                            if re.search(r'(\d+[분시일주]\s?전|방금\s?전|\d{4}\.\d{2}\.\d{2}\.?)', txt):
-                                article_date = txt
+                            # (A) 날짜 패턴 찾기 (우선순위: 분/시/일 전 > YYYY.MM.DD)
+                            if not article_date:
+                                date_match = re.search(r'(\d+[분시일주]\s?전|방금\s?전|\d{4}\.\d{2}\.\d{2}\.?)', area_text)
+                                if date_match:
+                                    article_date = date_match.group(1)
                             
-                            # (B) 지면 정보 (A1면 등)
-                            elif re.search(r'[A-Za-z]*\d+면', txt):
-                                paper_info = f" ({txt})"
+                            # (B) 지면 정보 찾기
+                            if not paper_info:
+                                paper_match = re.search(r'([A-Za-z]*\d+면)', area_text)
+                                if paper_match:
+                                    paper_info = f" ({paper_match.group(1)})"
 
                     full_title = f"{title}{paper_info}"
 
