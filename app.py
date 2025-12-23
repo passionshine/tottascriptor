@@ -22,7 +22,7 @@ def get_target_date():
         target += datetime.timedelta(days=1)
     return target
 
-# --- [2. 뉴스 스크래퍼] ---
+# --- [2. 뉴스 스크래퍼 (수정됨)] ---
 class NewsScraper:
     def __init__(self):
         self.scraper = cloudscraper.create_scraper()
@@ -49,41 +49,48 @@ class NewsScraper:
                 
                 for t_tag in items:
                     if len(all_results) >= max_articles: break
+                    
+                    # 1. 기본 정보 추출
                     title = t_tag.get('title') if t_tag.get('title') else t_tag.get_text(strip=True)
-                    link = t_tag.get('href')
-                    if link in seen_links: continue
-                    seen_links.add(link)
+                    original_link = t_tag.get('href') # 언론사 원문 링크
+                    
+                    # 2. 중복 제거 (제목 기준)
+                    if title in seen_links: continue
+                    seen_links.add(title)
+                    
+                    # 3. 부모 컨테이너(news_area) 찾기
+                    news_area = t_tag.find_parent('div', class_='news_area')
                     
                     press_name = "알 수 없음"
-                    is_naver = False 
-                    
-                    card = t_tag
-                    found_press = False
-                    
-                    for _ in range(5):
-                        if card.parent:
-                            card = card.parent
-                            
-                            # 언론사 이름 찾기
-                            if not found_press:
-                                p_el = card.select_one(".sds-comps-profile-info-title-text, .press_name, .info.press")
-                                if p_el: 
-                                    press_name = p_el.get_text(strip=True)
-                                    found_press = True
-                            
-                            # 네이버 뉴스 뱃지 확인
-                            if not is_naver:
-                                if card.find(string="네이버뉴스"): 
-                                    is_naver = True
+                    is_naver = False
+                    final_link = original_link # 기본값은 원문 링크
+
+                    if news_area:
+                        # 4. 언론사 이름 찾기
+                        p_el = news_area.select_one(".info.press")
+                        if p_el:
+                            press_name = p_el.get_text(strip=True)
+                        
+                        # 5. [핵심 수정] 네이버 뉴스 링크 파싱 로직
+                        # .info 클래스를 가진 a태그 중 "네이버뉴스" 텍스트가 포함된 것을 찾음
+                        info_links = news_area.select("a.info")
+                        for info in info_links:
+                            if "네이버뉴스" in info.get_text():
+                                is_naver = True
+                                final_link = info['href'] # 링크를 네이버 뉴스 URL로 교체
+                                break
 
                     all_results.append({
                         'title': title, 
-                        'link': link, 
+                        'link': final_link, # 교체된 링크 저장
                         'press': press_name,
                         'is_naver': is_naver
                     })
                 time.sleep(0.1)
-            except: break
+            except Exception as e:
+                # 에러 디버깅을 위해 print 정도는 남겨두는 것이 좋습니다.
+                print(f"Error: {e}") 
+                break
         return all_results
 
 # --- [3. UI 설정] ---
@@ -234,7 +241,8 @@ with st.expander("🔍 뉴스 검색 설정", expanded=True):
     with col_d2: end_d = st.date_input("종료일", datetime.date.today())
     max_a = st.slider("최대 기사 수", 10, 100, 30)
     if st.button("🚀 뉴스 검색 시작", type="primary", use_container_width=True):
-        st.session_state.search_results = NewsScraper().fetch_news(start_d, end_d, keyword, max_a)
+        with st.spinner('뉴스를 검색하고 URL을 분석 중입니다...'):
+            st.session_state.search_results = NewsScraper().fetch_news(start_d, end_d, keyword, max_a)
         st.rerun()
 
 # 3. 뉴스 리스트 출력 함수 (공통 사용)
@@ -246,6 +254,7 @@ def display_news_section(title, articles, section_key):
         return
 
     for i, res in enumerate(articles):
+        # 스크랩 텍스트 생성: 제목_언론사 (줄바꿈) URL
         item_check = f"ㅇ {res['title']}_{res['press']}\n{res['link']}\n\n"
         is_scraped = (item_check in st.session_state.corp_list) or (item_check in st.session_state.rel_list)
         bg_class = "bg-scraped" if is_scraped else "bg-white"
