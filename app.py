@@ -24,10 +24,10 @@ def get_target_date():
         target += datetime.timedelta(days=1)
     return target
 
-# --- [2. 뉴스 스크래퍼 (하이브리드: JSON + HTML)] ---
+# --- [2. 뉴스 스크래퍼 (하이브리드: JSON + HTML 백업)] ---
 class NewsScraper:
     def __init__(self):
-        # cloudscraper 대신 requests 사용 (속도 및 호환성)
+        # 일반 브라우저처럼 보이게 헤더 설정
         self.headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
             'Referer': 'https://www.naver.com/',
@@ -56,41 +56,45 @@ class NewsScraper:
             start_val = (page * 10) + 1
             url = f"https://search.naver.com/search.naver?where=news&query={query}&sm=tab_pge&sort=1&photo=0&pd=3&ds={ds}&de={de}&nso={nso}&start={start_val}"
             
-            status_text.text(f"⏳ {page+1}페이지 처리 중... (현재 {len(all_results)}건)")
+            status_text.text(f"⏳ {page+1}페이지 수집 중... (현재 {len(all_results)}건)")
             
             try:
                 res = requests.get(url, headers=self.headers, timeout=10)
                 if res.status_code != 200:
-                    with log_container: st.error(f"❌ 접속 실패: {res.status_code}")
+                    with log_container: st.error(f"❌ 접속 실패 (Code: {res.status_code})")
                     continue
 
                 soup = BeautifulSoup(res.content, 'html.parser')
                 
-                # --- [시도 1] JSON 파싱 ---
+                # ---------------------------------------------------------
+                # [전략 1] JSON 파싱 시도 (가장 정확한 정보)
+                # ---------------------------------------------------------
                 json_success = False
-                scripts = soup.find_all('script')
                 items_list = []
                 
+                scripts = soup.find_all('script')
                 for script in scripts:
                     if script.string and 'entry.bootstrap' in script.string:
-                        # 정규식 패턴을 더 유연하게 변경
+                        # 정규식 유연화: 앞부분을 .*? 로 처리하여 변수명 변경 등에 대응
                         pattern = r'entry\.bootstrap\(.*?, ({.*})\);'
                         match = re.search(pattern, script.string, re.DOTALL)
                         if match:
                             try:
                                 json_data = json.loads(match.group(1))
                                 items_list = json_data.get('body', {}).get('props', {}).get('children', [])
-                                json_success = True
+                                if items_list:
+                                    json_success = True
                                 break
                             except: continue
 
-                # JSON 파싱 성공 시 데이터 추출
-                if json_success and items_list:
-                    # with log_container: st.success(f"✅ JSON 파싱 성공 ({len(items_list)}개 항목)")
+                # JSON 파싱 성공 시 데이터 처리
+                if json_success:
+                    # with log_container: st.caption(f"✅ {page+1}페이지: JSON 파싱 성공")
                     for item in items_list:
+                        if len(all_results) >= max_articles: break
                         if item.get('templateId') != 'newsItem': continue
-                        props = item.get('props', {})
                         
+                        props = item.get('props', {})
                         raw_title = props.get('title', '')
                         clean_title = re.sub('<[^<]+?>', '', raw_title)
                         original_link = props.get('titleHref', '')
@@ -100,7 +104,7 @@ class NewsScraper:
 
                         press_name = props.get('sourceProfile', {}).get('title', '알 수 없음')
                         
-                        # 상세 정보 파싱
+                        # 지면정보 및 네이버뉴스 링크
                         sub_texts = props.get('subTexts', [])
                         is_naver = False
                         final_link = original_link
@@ -121,12 +125,20 @@ class NewsScraper:
                             'is_naver': is_naver
                         })
                 
-                # --- [시도 2] HTML 파싱 (JSON 실패 시 백업) ---
+                # ---------------------------------------------------------
+                # [전략 2] HTML 직접 파싱 (JSON 실패 시 비상 작동)
+                # ---------------------------------------------------------
                 else:
-                    with log_container: st.warning(f"⚠️ {page+1}페이지: JSON 실패 -> HTML 직접 파싱 시도")
+                    with log_container: st.warning(f"⚠️ {page+1}페이지: JSON 추출 실패 → HTML 직접 파싱으로 전환합니다.")
+                    
+                    # 네이버 뉴스 리스트 컨테이너 찾기
                     news_items = soup.select('div.news_wrap')
+                    if not news_items:
+                        news_items = soup.select('li.bx') # 모바일/다른 뷰일 경우 대비
                     
                     for news in news_items:
+                        if len(all_results) >= max_articles: break
+                        
                         title_tag = news.select_one('a.news_tit')
                         if not title_tag: continue
                         
@@ -140,17 +152,17 @@ class NewsScraper:
                         press_tag = news.select_one('a.info.press')
                         press = press_tag.get_text(strip=True) if press_tag else "알 수 없음"
                         
-                        # 네이버뉴스 링크 & 지면정보
+                        # 네이버뉴스 링크 확인
                         is_naver = False
-                        paper_info = ""
-                        
                         info_links = news.select('a.info')
                         for info in info_links:
                             if "네이버뉴스" in info.get_text():
                                 is_naver = True
                                 link = info['href']
+                                break
                         
-                        # 지면 정보 (span.info 텍스트 확인)
+                        # 지면 정보 확인 (span.info 텍스트 등)
+                        paper_info = ""
                         spans = news.select('span.info')
                         for span in spans:
                             txt = span.get_text(strip=True)
@@ -164,13 +176,19 @@ class NewsScraper:
                             'is_naver': is_naver
                         })
 
-                time.sleep(0.3)
+                time.sleep(0.5) # 차단 방지 딜레이
                 
             except Exception as e:
-                with log_container: st.error(f"Error: {e}")
+                with log_container: st.error(f"Error on page {page+1}: {e}")
                 continue
 
         status_text.empty()
+        # 결과 요약 로그
+        if not all_results:
+            with log_container: st.error("❌ 검색 결과가 0건입니다. (네이버가 봇을 완전히 차단했거나 검색어가 없습니다.)")
+        else:
+            with log_container: st.success(f"✅ 총 {len(all_results)}건 수집 완료")
+            
         return all_results
 
 # --- [3. UI 설정] ---
@@ -199,7 +217,7 @@ st.markdown("""
 for key in ['corp_list', 'rel_list', 'search_results']:
     if key not in st.session_state: st.session_state[key] = []
 
-st.title("🚇 또타 스크립터 (Final Fix)")
+st.title("🚇 또타 스크립터 (Final)")
 
 # 1. 결과 영역
 t_date = get_target_date()
@@ -243,7 +261,7 @@ with st.expander("🔍 뉴스 검색 설정", expanded=True):
     with d2: end_d = st.date_input("종료일", datetime.date.today())
     max_a = st.slider("최대 기사 수", 10, 100, 30)
     
-    # [핵심] st.rerun() 제거하여 검색 결과 및 로그 유지
+    # [핵심] st.rerun()을 제거했습니다. 이제 로그와 결과가 유지됩니다.
     if st.button("🚀 뉴스 검색 시작", type="primary", use_container_width=True):
         st.session_state.search_results = NewsScraper().fetch_news(start_d, end_d, keyword, max_a)
 
@@ -279,6 +297,7 @@ def display_list(title, items, key_prefix):
                         st.toast("🚆 추가됨"); time.sleep(0.1); st.rerun()
         st.markdown("<hr style='margin: 3px 0; border: none; border-top: 1px solid #f0f0f0;'>", unsafe_allow_html=True)
 
+# 검색 결과 표시
 if st.session_state.search_results:
     naver_news = [x for x in st.session_state.search_results if x['is_naver']]
     other_news = [x for x in st.session_state.search_results if not x['is_naver']]
