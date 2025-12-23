@@ -160,7 +160,7 @@ st.markdown("""
     .stButton > button, .stLinkButton > a { 
         width: 100% !important; 
         height: 38px !important; 
-        font-size: 11px !important; 
+        font-size: 13px !important; 
         font-weight: 600 !important;
         padding: 0 !important;
         display: flex; align-items: center; justify-content: center;
@@ -211,7 +211,7 @@ with st.expander("🔍 뉴스 검색 설정", expanded=True):
     if st.button("🚀 뉴스 검색 시작", type="primary", use_container_width=True):
         st.session_state.search_results = NewsScraper().fetch_news(sd, ed, kw, mx)
 
-# 3. 뉴스 리스트 출력 함수 (버튼 프레임 적용)
+# 3. 뉴스 리스트 출력 함수 (중복 체크 메시지 추가)
 def display_list(title, items, key_p):
     st.markdown(f'<div class="section-header">{title} ({len(items)}건)</div>', unsafe_allow_html=True)
     for i, res in enumerate(items):
@@ -222,7 +222,6 @@ def display_list(title, items, key_p):
         is_scraped = (item_txt in st.session_state.corp_list) or (item_txt in st.session_state.rel_list)
         bg = "bg-scraped" if is_scraped else ""
 
-        # [수정] 버튼 영역을 위해 컬럼 비율 조정 (0.7 vs 0.3 -> 0.65 vs 0.35)
         col_m, col_b = st.columns([0.65, 0.35])
         
         with col_m:
@@ -232,21 +231,28 @@ def display_list(title, items, key_p):
             </div>""", unsafe_allow_html=True)
         
         with col_b:
-            # [수정] 3개 버튼을 하나의 프레임(Container with border)에 담음
             with st.container(border=True):
                 b1, b2, b3 = st.columns(3, gap="small")
                 with b1: 
-                    st.link_button("원문보기", res['link'], use_container_width=True)
+                    st.link_button("원문", res['link'], use_container_width=True)
                 with b2:
-                    if st.button("공사보도", key=f"c_{key_p}_{i}", use_container_width=True):
+                    if st.button("공사", key=f"c_{key_p}_{i}", use_container_width=True):
                         if item_txt not in st.session_state.corp_list:
                             st.session_state.corp_list.append(item_txt)
-                            st.toast("🏢 공사 스크랩!", icon="✅"); time.sleep(0.5); st.rerun()
+                            st.toast("🏢 공사 관련 보도로 스크랩되었습니다!", icon="✅")
+                            time.sleep(0.5)
+                            st.rerun()
+                        else:
+                            st.toast("⚠️ 이미 스크랩된 기사입니다.", icon="❗")
                 with b3:
-                    if st.button("기타기사", key=f"r_{key_p}_{i}", use_container_width=True):
+                    if st.button("기타", key=f"r_{key_p}_{i}", use_container_width=True):
                         if item_txt not in st.session_state.rel_list:
                             st.session_state.rel_list.append(item_txt)
-                            st.toast("🚆 유관 스크랩!", icon="✅"); time.sleep(0.5); st.rerun()
+                            st.toast("🚆 유관기관 관련 보도로 스크랩되었습니다!", icon="✅")
+                            time.sleep(0.5)
+                            st.rerun()
+                        else:
+                            st.toast("⚠️ 이미 스크랩된 기사입니다.", icon="❗")
 
 # 분류 후 출력
 if st.session_state.search_results:
@@ -258,4 +264,3 @@ if st.session_state.search_results:
     if p_news: display_list("📰 지면 보도", p_news, "p")
     if n_news: display_list("🟢 네이버 뉴스", n_news, "n")
     if o_news: display_list("🌐 기타 뉴스", o_news, "o")
-
