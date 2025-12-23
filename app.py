@@ -76,43 +76,59 @@ class NewsScraper:
             except: break
         return all_results
 
-# --- [3. UI 설정 및 CSS (색상 적용)] ---
+# --- [3. UI 설정 및 모바일 한 줄 강제 CSS] ---
 st.set_page_config(page_title="또타 스크립터", layout="wide")
 
 st.markdown("""
     <style>
-    /* 공통 버튼 스타일 */
-    .stButton > button, .stLinkButton > a {
-        width: 100% !important; height: 36px !important;
-        font-size: 11px !important; font-weight: 800 !important;
-        border-radius: 8px !important;
-        display: inline-flex !important; align-items: center !important;
-        justify-content: center !important; white-space: nowrap !important;
+    /* [모바일 핵심] 컬럼이 세로로 쌓이지 않도록 강제 가로 배치 */
+    [data-testid="column"] {
+        flex-direction: row !important;
+        flex-wrap: nowrap !important;
+        align-items: center !important;
+        min-width: 0px !important;
+    }
+    
+    /* 각 컬럼 내부 요소 간격 조정 */
+    [data-testid="stHorizontalBlock"] {
+        gap: 4px !important;
     }
 
-    /* 3번째 컬럼 (공사보도) 버튼: 파스텔 블루 */
-    [data-testid="column"]:nth-of-type(3) button {
+    /* 공통 버튼 스타일 (폭 좁게 최적화) */
+    .stButton > button, .stLinkButton > a {
+        width: 100% !important; height: 38px !important;
+        font-size: 10px !important; font-weight: 800 !important;
+        padding: 0px 1px !important;
+        border-radius: 6px !important;
+        display: inline-flex !important; align-items: center !important;
+        justify-content: center !important; 
+        white-space: normal !important; /* 글자 줄바꿈 허용 */
+        line-height: 1.1 !important;
+    }
+
+    /* 공사보도 버튼: 파스텔 블루 */
+    div[data-testid="column"]:nth-of-type(3) button {
         background-color: #D1E9FF !important; color: #004085 !important;
         border: 1px solid #B8DAFF !important;
     }
 
-    /* 4번째 컬럼 (유관보도) 버튼: 파스텔 연두 */
-    [data-testid="column"]:nth-of-type(4) button {
+    /* 유관보도 버튼: 파스텔 연두 */
+    div[data-testid="column"]:nth-of-type(4) button {
         background-color: #E2F0D9 !important; color: #385723 !important;
         border: 1px solid #C5E0B4 !important;
     }
 
     /* 뉴스 카드 디자인 */
     .news-card {
-        background: white; padding: 12px; border-radius: 10px;
-        border-left: 6px solid #007bff; box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        background: white; padding: 10px; border-radius: 8px;
+        border-left: 5px solid #007bff; box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+        min-height: 50px;
     }
     .news-title { 
-        font-size: 15px !important; font-weight: 700; color: #111; 
-        line-height: 1.4; word-break: keep-all; white-space: normal !important;
+        font-size: 13px !important; font-weight: 700; color: #111; 
+        line-height: 1.3; word-break: keep-all; 
     }
-    .news-meta { font-size: 11px !important; color: #666; margin-top: 4px; }
-    [data-testid="column"] { padding: 0 3px !important; }
+    .news-meta { font-size: 9px !important; color: #666; margin-top: 3px; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -132,7 +148,7 @@ final_output += "".join(st.session_state.corp_list) if st.session_state.corp_lis
 final_output += "\n[철도 등 기타 유관기관 관련 보도]\n"
 final_output += "".join(st.session_state.rel_list) if st.session_state.rel_list else "(내용 없음)\n"
 
-st.text_area("스크랩 내용", value=final_output, height=200, label_visibility="collapsed")
+st.text_area("스크랩 내용", value=final_output, height=150, label_visibility="collapsed")
 if st.button("📋 전체 복사하기", use_container_width=True):
     st.toast("✅ 클립보드에 복사되었습니다!")
     components.html(f"<script>navigator.clipboard.writeText(`{final_output}`);</script>", height=0)
@@ -154,7 +170,7 @@ if st.button("🚀 뉴스 검색 시작", type="primary", use_container_width=Tr
     st.session_state.search_results = NewsScraper().fetch_news(start_d, end_d, keyword, max_a)
     st.rerun()
 
-# 3. 뉴스 리스트 (1줄 배치 및 색상 적용)
+# 3. 뉴스 리스트 (모바일 한 줄 강제 적용)
 if st.session_state.search_results:
     if "네이버 기사" in filter_choice:
         display_results = [r for r in st.session_state.search_results if r['is_naver']]
@@ -165,25 +181,24 @@ if st.session_state.search_results:
 
     for i, res in enumerate(display_results):
         with st.container():
-            col1, col2, col3, col4 = st.columns([0.7, 0.1, 0.1, 0.1])
+            # 모바일에서도 7:1:1:1 비율 유지 시도
+            col1, col2, col3, col4 = st.columns([0.64, 0.12, 0.12, 0.12])
             with col1:
                 st.markdown(f'<div class="news-card"><div class="news-title">{res["title"]}</div><div class="news-meta">[{res["press"]}] {res["time"]}</div></div>', unsafe_allow_html=True)
             with col2:
-                st.write(""); st.link_button("기사원문", res['link'])
+                st.link_button("원문", res['link'])
             with col3:
-                st.write("")
-                if st.button("공사보도", key=f"c_{i}"):
+                if st.button("공사+", key=f"c_{i}"):
                     item = f"ㅇ {res['title']}_{res['press']}\n{res['link']}\n\n"
                     if item not in st.session_state.corp_list:
                         st.session_state.corp_list.append(item)
-                        st.toast(f"🏢 공사 섹션 추가: {res['press']}", icon="✅")
+                        st.toast(f"🏢 공사 섹션 추가 완료", icon="✅")
                         st.rerun()
             with col4:
-                st.write("")
-                if st.button("유관보도", key=f"r_{i}"):
+                if st.button("유관+", key=f"r_{i}"):
                     item = f"ㅇ {res['title']}_{res['press']}\n{res['link']}\n\n"
                     if item not in st.session_state.rel_list:
                         st.session_state.rel_list.append(item)
-                        st.toast(f"🚆 유관기관 추가: {res['press']}", icon="✅")
+                        st.toast(f"🚆 유관기관 추가 완료", icon="✅")
                         st.rerun()
-        st.write("---")
+        st.write("") # 기사 간 미세 여백
