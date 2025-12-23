@@ -23,7 +23,7 @@ def get_target_date():
         target += datetime.timedelta(days=1)
     return target
 
-# --- [2. 뉴스 스크래퍼 (통합 버전)] ---
+# --- [2. 뉴스 스크래퍼 (최종 수정: 날짜 선택자 강화)] ---
 class NewsScraper:
     def __init__(self):
         self.scraper = cloudscraper.create_scraper()
@@ -42,7 +42,7 @@ class NewsScraper:
         query = f'"{keyword}"'
         max_pages = (max_articles // 10) + 1
         
-        # 진행상황 UI
+        # UI 관련
         status_text = st.empty()
         progress_bar = st.progress(0)
         log_container = st.container()
@@ -52,7 +52,7 @@ class NewsScraper:
         for page in range(1, max_pages + 1):
             if len(all_results) >= max_articles: break
             
-            # 진행률 업데이트
+            # 진행률 바
             current_progress = min(page / max_pages, 1.0)
             progress_bar.progress(current_progress)
             status_text.text(f"⏳ {page}/{max_pages}페이지 분석 중... (현재 {len(all_results)}건)")
@@ -83,7 +83,7 @@ class NewsScraper:
                     title = t_tag.get_text(strip=True)
                     original_link = t_tag.get('href')
                     
-                    # 부모 카드 찾기 (DOM 탐색)
+                    # 부모 카드 찾기
                     card = None
                     curr = t_tag
                     for _ in range(5):
@@ -111,17 +111,18 @@ class NewsScraper:
                         if press_el:
                             press_name = press_el.get_text(strip=True)
                         
-                        # 3. 날짜 및 지면 정보 파싱
-                        # span 태그들 모두 확인
-                        info_spans = card.select(".info, .subtexts span")
+                        # 3. [수정됨] 날짜 및 지면 정보 파싱 (sds-comps-text 클래스 추가)
+                        # span[class*="sds-comps-text"] : 클래스명에 sds-comps-text가 포함된 모든 span 검색
+                        info_spans = card.select(".info, .subtexts span, span[class*='sds-comps-text']")
+                        
                         for span in info_spans:
                             txt = span.get_text(strip=True)
                             
-                            # 날짜 패턴 (1시간 전, 2024.01.01 등)
+                            # (A) 날짜 패턴 (1시간 전, 2분 전, 2024.01.01 등)
                             if re.search(r'(\d+[분시일주]\s?전|방금\s?전|\d{4}\.\d{2}\.\d{2}\.?)', txt):
                                 article_date = txt
                             
-                            # 지면 정보 패턴 (A1면 등)
+                            # (B) 지면 정보 (A1면 등)
                             elif re.search(r'[A-Za-z]*\d+면', txt):
                                 paper_info = f" ({txt})"
 
@@ -233,7 +234,6 @@ def display_list(title, items, key_prefix):
         return
 
     for i, res in enumerate(items):
-        # [수정] .get으로 안전하게 가져오기
         date_val = res.get('date', '')
         date_str = f"[{date_val}] " if date_val else ""
         item_txt = f"ㅇ {date_str}{res['title']}_{res['press']}\n{res['link']}\n\n"
@@ -257,12 +257,12 @@ def display_list(title, items, key_prefix):
                 if st.button("공사", key=f"c_{key_prefix}_{i}"):
                     if item_txt not in st.session_state.corp_list:
                         st.session_state.corp_list.append(item_txt)
-                        st.toast("🏢 공사 관련 기사에 스크랩되었습니다!"); time.sleep(1.5); st.rerun()
+                        st.toast("🏢 추가되었습니다!"); time.sleep(1.5); st.rerun()
             with c4:
                 if st.button("유관", key=f"r_{key_prefix}_{i}"):
                     if item_txt not in st.session_state.rel_list:
                         st.session_state.rel_list.append(item_txt)
-                        st.toast("🚆 유관기관 기타 기사에 스크랩 되었습니다!"); time.sleep(1.5); st.rerun()
+                        st.toast("🚆 추가되었습니다!"); time.sleep(1.5); st.rerun()
         
         st.markdown("<hr style='margin: 3px 0; border: none; border-top: 1px solid #f0f0f0;'>", unsafe_allow_html=True)
 
