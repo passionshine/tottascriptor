@@ -91,7 +91,7 @@ st.markdown("""
     .stButton > button {
         width: 100% !important;
         height: 38px !important;
-        padding: 0px !important;
+        padding: 0px 5px !important;
         font-size: 12px !important;
         font-weight: bold !important;
         border-radius: 6px !important;
@@ -239,13 +239,13 @@ if st.session_state.search_results:
                 if st.button("🏢 공사", key=f"c_{i}"):
                     if item_check not in st.session_state.corp_list:
                         st.session_state.corp_list.append(item_check)
-                        st.toast("🏢 공사 추가 완료!"); time.sleep(0.1); st.rerun()
+                        st.toast("🏢 공사관련 보도 추가 완료!"); time.sleep(0.1); st.rerun()
                     else: st.toast("⚠️ 이미 추가됨")
             with col4:
                 if st.button("🚆 유관", key=f"r_{i}"):
                     if item_check not in st.session_state.rel_list:
                         st.session_state.rel_list.append(item_check)
-                        st.toast("🚆 유관 추가 완료!"); time.sleep(0.1); st.rerun()
+                        st.toast("🚆 유관기관 보도 추가 완료!"); time.sleep(0.1); st.rerun()
                     else: st.toast("⚠️ 이미 추가됨")
         
         # 항목 간 구분선 (너무 굵지 않게 margin으로 처리하거나 얇은 hr 사용)
