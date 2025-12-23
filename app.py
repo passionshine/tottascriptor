@@ -6,19 +6,29 @@ import time
 import re
 import streamlit.components.v1 as components
 
-# --- [1. 스마트 날짜 계산 함수] ---
+# --- [1. 스마트 날짜 계산 함수 (2026년 공휴일 반영)] ---
 def get_target_date():
     today = datetime.date.today()
     if today.weekday() == 4: target = today + datetime.timedelta(days=3)
     elif today.weekday() == 5: target = today + datetime.timedelta(days=2)
     else: target = today + datetime.timedelta(days=1)
 
+    # 2026년 주요 공휴일 (대체공휴일 포함)
     holidays = [
-        datetime.date(2025,1,1), datetime.date(2025,1,28), datetime.date(2025,1,29), datetime.date(2025,1,30),
-        datetime.date(2025,3,1), datetime.date(2025,3,3), datetime.date(2025,5,5), datetime.date(2025,5,6),
-        datetime.date(2025,6,6), datetime.date(2025,8,15), datetime.date(2025,10,3), datetime.date(2025,10,5),
-        datetime.date(2025,10,6), datetime.date(2025,10,7), datetime.date(2025,10,8), datetime.date(2025,10,9), datetime.date(2025,12,25),
+        datetime.date(2026,1,1),  # 신정
+        datetime.date(2026,2,16), datetime.date(2026,2,17), datetime.date(2026,2,18), # 설날
+        datetime.date(2026,3,1), datetime.date(2026,3,2), # 삼일절 및 대체
+        datetime.date(2026,5,5),  # 어린이날
+        datetime.date(2026,5,24), datetime.date(2026,5,25), # 부처님오신날 및 대체
+        datetime.date(2026,6,6),  # 현충일
+        datetime.date(2026,8,15), # 광복절
+        datetime.date(2026,9,24), datetime.date(2026,9,25), datetime.date(2026,9,26), # 추석
+        datetime.date(2026,10,3), # 개천절
+        datetime.date(2026,10,9), # 한글날
+        datetime.date(2026,12,25) # 성탄절
     ]
+    
+    # 목표일이 공휴일이거나 주말이면 다음 평일로 이동
     while target in holidays or target.weekday() >= 5:
         target += datetime.timedelta(days=1)
     return target
@@ -92,6 +102,7 @@ class NewsScraper:
                     press_name = "알 수 없음"
                     paper_info = ""
                     article_date = ""
+                    is_paper = False # 지면 기사 여부
 
                     if card:
                         naver_btn = card.select_one('a[href*="n.news.naver.com"]')
@@ -103,14 +114,19 @@ class NewsScraper:
                         if press_el: press_name = press_el.get_text(strip=True)
                         
                         full_text = card.get_text(separator=" ", strip=True)
+                        
+                        # 날짜 파싱
                         date_match = re.search(r'(\d+[분시일주초]\s?전|방금\s?전)', full_text)
                         if date_match: article_date = date_match.group(1)
                         else:
                             date_match_2 = re.search(r'(\d{4}\.\d{2}\.\d{2}\.?)', full_text)
                             if date_match_2: article_date = date_match_2.group(1)
 
+                        # [수정] 지면 정보 파싱 -> "(지면)"으로 통일
                         paper_match = re.search(r'([A-Za-z]*\d+면)', full_text)
-                        if paper_match: paper_info = f" ({paper_match.group(1)})"
+                        if paper_match:
+                            paper_info = " (지면)" # 구체적 숫자 대신 (지면) 표시
+                            is_paper = True
 
                     full_title = f"{title}{paper_info}"
 
@@ -122,6 +138,7 @@ class NewsScraper:
                         'link': final_link,
                         'press': press_name,
                         'is_naver': is_naver,
+                        'is_paper': is_paper, # 분류를 위해 플래그 추가
                         'date': article_date
                     })
                     
@@ -144,14 +161,11 @@ st.set_page_config(page_title="Totta Scraper", layout="wide")
 
 st.markdown("""
     <style>
-    /* [핵심] 컬럼 간 수직 중앙 정렬 */
     div[data-testid="column"] { 
         display: flex !important; 
         flex-direction: column !important; 
         justify-content: center !important; 
     }
-    
-    /* 뉴스 카드 스타일 */
     .news-card { 
         padding: 12px 16px; 
         border-radius: 8px; 
@@ -162,18 +176,18 @@ st.markdown("""
         display: flex;
         flex-direction: column;
         justify-content: center;
+        margin-right: 15px !important;
+        margin-bottom: 5px !important; 
     }
     .bg-scraped { background: #f8f9fa !important; border-left: 5px solid #adb5bd !important; opacity: 0.7; }
-    
     .news-title { font-size: 16px !important; font-weight: 700; color: #222; margin-bottom: 5px; line-height: 1.3; }
     .news-meta { font-size: 13px !important; color: #666; font-weight: 500; }
     
-    /* 버튼 스타일 (작고 깔끔하게) */
     .stButton > button, .stLinkButton > a { 
         width: 100% !important; 
-        height: 36px !important; /* 높이 통일 */
+        height: 36px !important; 
         border-radius: 6px !important; 
-        font-size: 11px !important;
+        font-size: 13px !important;
         font-weight: 600 !important;
         padding: 0px 5px !important;
         border: 1px solid #e0e0e0 !important;
@@ -181,20 +195,15 @@ st.markdown("""
         color: #555 !important;
         box-shadow: 0 1px 2px rgba(0,0,0,0.05) !important;
     }
-    
     .stButton > button:hover, .stLinkButton > a:hover {
         border-color: #007bff !important;
         color: #007bff !important;
         background-color: #f0f7ff !important;
     }
+    .section-header { font-size: 18px; font-weight: 700; color: #333; margin-top: 30px; margin-bottom: 15px; border-bottom: 2px solid #007bff; display: inline-block; }
     
-    /* 간격 조정 */
-    hr { margin: 8px 0 !important; }
-    
-    /* 공사/유관 버튼 색상 포인트 */
-    div[data-testid="stHorizontalBlock"] .stButton:nth-of-type(2) button { color: #0056b3 !important; } /* 공사 */
-    div[data-testid="stHorizontalBlock"] .stButton:nth-of-type(3) button { color: #198754 !important; } /* 유관 */
-    
+    div[data-testid="stHorizontalBlock"] .stButton:nth-of-type(2) button { color: #0056b3 !important; }
+    div[data-testid="stHorizontalBlock"] .stButton:nth-of-type(3) button { color: #198754 !important; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -216,26 +225,16 @@ else:
 text_height = max(180, (final_output.count('\n') + 1) * 25)
 st.text_area("📋 스크랩 결과", value=final_output, height=text_height)
 
-# 복사 버튼 (HTML/JS)
 if final_output:
     js_code = f"""
     <html>
         <head>
             <style>
                 .copy-btn {{
-                    display: inline-flex;
-                    align-items: center;
-                    justify-content: center;
-                    width: 100%;
-                    height: 38px;
-                    background-color: #f0f2f6;
-                    color: #31333F;
-                    border: 1px solid #d1d5db;
-                    border-radius: 6px;
-                    cursor: pointer;
-                    font-family: sans-serif;
-                    font-weight: 600;
-                    font-size: 14px;
+                    display: inline-flex; align-items: center; justify-content: center;
+                    width: 100%; height: 38px; background-color: #f0f2f6;
+                    color: #31333F; border: 1px solid #d1d5db; border-radius: 6px;
+                    cursor: pointer; font-family: sans-serif; font-weight: 600; font-size: 14px;
                 }}
                 .copy-btn:hover {{ border-color: #007bff; color: #007bff; background-color: #e7f3ff; }}
             </style>
@@ -252,9 +251,7 @@ if final_output:
                         var successful = document.execCommand('copy');
                         if (successful) alert('✅ 복사되었습니다!');
                         else alert('❌ 복사 실패.');
-                    }} catch (err) {{
-                        alert('❌ 브라우저 차단됨.');
-                    }}
+                    }} catch (err) {{ alert('❌ 브라우저 차단됨.'); }}
                 }}
             </script>
         </body>
@@ -266,7 +263,6 @@ if st.button("🗑️ 전체 초기화", use_container_width=True):
     st.session_state.corp_list, st.session_state.rel_list = [], []
     st.rerun()
 
-# 개별 관리
 with st.expander("🛠️ 스크랩 항목 관리", expanded=False):
     st.write("**🏢 공사 보도**")
     for idx, item in enumerate(st.session_state.corp_list):
@@ -309,12 +305,7 @@ def display_list(title, items, key_prefix):
         is_scraped = (item_txt in st.session_state.corp_list) or (item_txt in st.session_state.rel_list)
         bg = "bg-scraped" if is_scraped else "bg-white"
 
-        # [레이아웃 변경] 
-        # 왼쪽 큰 덩어리(뉴스) vs 오른쪽 작은 덩어리(버튼그룹)
-        # 비율을 7.5 : 2.5 로 설정하여 버튼들이 오른쪽 끝으로 붙게 함
         main_cols = st.columns([0.75, 0.25], gap="small")
-        
-        # 1. 왼쪽: 뉴스 카드 영역
         with main_cols[0]:
             st.markdown(f'''<div class="news-card {bg}">
                 <div class="news-title">{res["title"]}</div>
@@ -324,33 +315,39 @@ def display_list(title, items, key_prefix):
                 </div>
             </div>''', unsafe_allow_html=True)
 
-        # 2. 오른쪽: 버튼 영역 (내부에서 다시 3등분하여 옹기종기 모음)
         with main_cols[1]:
-            # gap="small"로 버튼 사이 간격 좁힘
             btn_cols = st.columns(3, gap="small") 
-            
             with btn_cols[0]:
-                st.link_button("원문보기", res['link'], use_container_width=True)
+                st.link_button("원문", res['link'], use_container_width=True)
             with btn_cols[1]:
-                if st.button("공사기사", key=f"c_{key_prefix}_{i}", use_container_width=True):
+                if st.button("공사", key=f"c_{key_prefix}_{i}", use_container_width=True):
                     if item_txt not in st.session_state.corp_list:
                         st.session_state.corp_list.append(item_txt)
-                        st.toast("🏢 공사 관련 보도에 추가됨!", icon="✅"); time.sleep(1.0); st.rerun()
+                        st.toast("🏢 추가됨!", icon="✅"); time.sleep(1.0); st.rerun()
             with btn_cols[2]:
-                if st.button("기타기사", key=f"r_{key_prefix}_{i}", use_container_width=True):
+                if st.button("유관", key=f"r_{key_prefix}_{i}", use_container_width=True):
                     if item_txt not in st.session_state.rel_list:
                         st.session_state.rel_list.append(item_txt)
-                        st.toast("🚆 유관기관 기타 보도에 추가됨!", icon="✅"); time.sleep(1.0); st.rerun()
+                        st.toast("🚆 추가됨!", icon="✅"); time.sleep(1.0); st.rerun()
         
-        # 구분선
         st.markdown("<div style='margin-bottom: 6px;'></div>", unsafe_allow_html=True)
 
+# [핵심 변경] 결과 분류 로직
 if st.session_state.search_results:
-    naver_news = [x for x in st.session_state.search_results if x.get('is_naver')]
-    other_news = [x for x in st.session_state.search_results if not x.get('is_naver')]
+    # 1. 지면 기사 (is_paper == True)
+    paper_news = [x for x in st.session_state.search_results if x.get('is_paper')]
     
+    # 2. 네이버 뉴스 (is_naver == True 이면서 지면 기사가 아닌 것)
+    naver_news = [x for x in st.session_state.search_results if x.get('is_naver') and not x.get('is_paper')]
+    
+    # 3. 기타 뉴스 (나머지)
+    other_news = [x for x in st.session_state.search_results if not x.get('is_naver') and not x.get('is_paper')]
+    
+    # 순서대로 출력 (지면 보도가 최상단)
+    if paper_news:
+        display_list("📰 지면 보도", paper_news, "p")
+        st.write("") # 간격
+        
     display_list("🟢 네이버 뉴스", naver_news, "n")
     st.write("")
     display_list("🌐 언론사 자체 기사", other_news, "o")
-
-
