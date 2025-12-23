@@ -23,7 +23,7 @@ def get_target_date():
         target += datetime.timedelta(days=1)
     return target
 
-# --- [2. 뉴스 스크래퍼 (강력한 파싱 로직)] ---
+# --- [2. 뉴스 스크래퍼 (만능 텍스트 스캔 적용)] ---
 class NewsScraper:
     def __init__(self):
         self.scraper = cloudscraper.create_scraper()
@@ -56,7 +56,6 @@ class NewsScraper:
             status_text.text(f"⏳ {page}/{max_pages}페이지 분석 중... (현재 {len(all_results)}건)")
             
             start_index = (page - 1) * 10 + 1
-            # qdt=1 파라미터 적용
             url = f"https://search.naver.com/search.naver?where=news&query={query}&sm=tab_pge&sort=1&photo=0&pd=3&ds={ds}&de={de}&nso={nso}&qdt=1&start={start_index}"
             
             try:
@@ -110,21 +109,26 @@ class NewsScraper:
                         if press_el:
                             press_name = press_el.get_text(strip=True)
                         
-                        # 3. 날짜 및 지면 정보 파싱 (텍스트 전체 스캔)
-                        full_text = card.get_text(separator=" ", strip=True)
-                        
-                        # 날짜 패턴
-                        date_match = re.search(r'(\d+[분시일주]\s?전|방금\s?전)', full_text)
-                        if date_match:
-                            article_date = date_match.group(1)
-                        else:
-                            date_match_2 = re.search(r'(\d{4}\.\d{2}\.\d{2}\.?)', full_text)
-                            if date_match_2: article_date = date_match_2.group(1)
-
-                        # 지면 정보 패턴
-                        paper_match = re.search(r'([A-Za-z]*\d+면)', full_text)
-                        if paper_match:
-                            paper_info = f" ({paper_match.group(1)})"
+                        # 3. [최강 파싱 로직] 카드의 모든 텍스트 조각을 하나하나 검사
+                        # stripped_strings는 태그 안의 순수 텍스트만 리스트로 반환합니다.
+                        # 예: ["서울교통공사", "적자 감축", "이데일리", "2분 전", "네이버뉴스"]
+                        for txt in card.stripped_strings:
+                            
+                            # (A) 날짜 패턴 (우선순위: 분/시/일/주 전 > 방금 전 > YYYY.MM.DD)
+                            if not article_date:
+                                if re.search(r'(\d+[분시일주초]\s?전|방금\s?전)', txt):
+                                    article_date = txt
+                                elif re.search(r'(\d{4}\.\d{2}\.\d{2}\.?)', txt):
+                                    article_date = txt
+                            
+                            # (B) 지면 정보 (A1면 등)
+                            if not paper_info:
+                                if re.search(r'([A-Za-z]*\d+면)', txt):
+                                    paper_info = f" ({txt})"
+                            
+                            # 둘 다 찾았으면 더 이상 루프 돌 필요 없음
+                            if article_date and paper_info:
+                                break
 
                     full_title = f"{title}{paper_info}"
 
@@ -158,18 +162,37 @@ st.set_page_config(page_title="Totta Scraper", layout="wide")
 
 st.markdown("""
     <style>
-    [data-testid="stHorizontalBlock"] { gap: 4px !important; align-items: center !important; }
+    /* 전체 레이아웃 간격 조정 */
+    [data-testid="stHorizontalBlock"] { gap: 10px !important; align-items: start !important; }
     div[data-testid="column"], div[data-testid="stColumn"] { padding: 0px !important; display: flex !important; justify-content: center !important; }
+    
+    /* 버튼 스타일 */
     .stButton > button { width: 100% !important; height: 38px !important; border-radius: 6px !important; }
     .stLinkButton > a { width: 100% !important; height: 38px !important; display: flex; align-items: center; justify-content: center; font-size: 11px !important; }
     
-    .news-card { padding: 8px 12px; border-radius: 6px; border-left: 4px solid #007bff; box-shadow: 0 1px 1px rgba(0,0,0,0.05); display: flex; flex-direction: column; justify-content: center; height: 100%; }
-    .bg-scraped { background: #eee !important; border-left: 4px solid #888 !important; opacity: 0.7; }
-    .bg-white { background: white !important; }
-    .news-title { font-size: 16px !important; font-weight: 600; color: #333; line-height: 1.2; margin-bottom: 2px; }
-    .news-meta { font-size: 13px !important; color: #666; }
-    .section-header { font-size: 18px; font-weight: 700; color: #333; margin-top: 20px; margin-bottom: 10px; border-bottom: 2px solid #007bff; display: inline-block; }
+    /* [수정] 뉴스 카드 스타일 - 간격 추가 */
+    .news-card { 
+        padding: 10px 14px; 
+        border-radius: 8px; 
+        border-left: 5px solid #007bff; 
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1); 
+        display: flex; 
+        flex-direction: column; 
+        justify-content: center; 
+        height: 100%;
+        margin-right: 15px !important; /* [추가] 오른쪽 버튼과 간격 벌리기 */
+        margin-bottom: 5px !important; 
+    }
     
+    .bg-scraped { background: #f1f3f5 !important; border-left: 5px solid #adb5bd !important; opacity: 0.8; }
+    .bg-white { background: white !important; }
+    
+    .news-title { font-size: 16px !important; font-weight: 600; color: #333; line-height: 1.3; margin-bottom: 4px; }
+    .news-meta { font-size: 13px !important; color: #666; }
+    
+    .section-header { font-size: 18px; font-weight: 700; color: #333; margin-top: 30px; margin-bottom: 15px; border-bottom: 2px solid #007bff; display: inline-block; }
+    
+    /* 버튼 색상 */
     div[data-testid="stHorizontalBlock"] > div:nth-child(3) button { background-color: #e3f2fd !important; color: #1565c0 !important; border: 1px solid #90caf9 !important; }
     div[data-testid="stHorizontalBlock"] > div:nth-child(4) button { background-color: #e8f5e9 !important; color: #2e7d32 !important; border: 1px solid #a5d6a7 !important; }
     </style>
@@ -181,7 +204,7 @@ for key in ['corp_list', 'rel_list', 'search_results']:
 
 st.title("🚇 또타 스크립터 (Final Ver)")
 
-# 1. 스크랩 목록 (복사 기능 수정됨)
+# 1. 스크랩 목록
 t_date = get_target_date()
 date_header = f"<{t_date.month}월 {t_date.day}일 조간 스크랩>"
 
@@ -190,13 +213,10 @@ if st.session_state.corp_list or st.session_state.rel_list:
 else:
     final_output = ""
 
-# 텍스트 영역 (높이 자동 조절)
 text_height = max(180, (final_output.count('\n') + 1) * 25)
 st.text_area("📋 스크랩 결과", value=final_output, height=text_height)
 
-# --- [복사 버튼 영역] ---
-# Streamlit 버튼 대신 HTML/JS를 사용하여 클립보드 복사를 강제합니다.
-# 이 방식은 HTTPS가 아닌 환경이나 모바일에서도 작동하도록 execCommand 폴백을 사용합니다.
+# 복사 버튼 (HTML/JS)
 if final_output:
     js_code = f"""
     <html>
@@ -228,17 +248,13 @@ if final_output:
                 function copyToClipboard() {{
                     var textArea = document.getElementById("hidden-text");
                     textArea.select();
-                    textArea.setSelectionRange(0, 99999); /* For mobile devices */
-                    
+                    textArea.setSelectionRange(0, 99999);
                     try {{
                         var successful = document.execCommand('copy');
-                        if (successful) {{
-                            alert('✅ 복사되었습니다!');
-                        }} else {{
-                            alert('❌ 복사에 실패했습니다. 수동으로 복사해주세요.');
-                        }}
+                        if (successful) alert('✅ 복사되었습니다!');
+                        else alert('❌ 복사 실패. 수동으로 복사해주세요.');
                     }} catch (err) {{
-                        alert('❌ 브라우저가 복사를 차단했습니다.');
+                        alert('❌ 브라우저 차단됨.');
                     }}
                 }}
             </script>
@@ -247,7 +263,6 @@ if final_output:
     """
     components.html(js_code, height=50)
 
-# 초기화 버튼 (파이썬 버튼 사용)
 if st.button("🗑️ 전체 초기화", use_container_width=True):
     st.session_state.corp_list, st.session_state.rel_list = [], []
     st.rerun()
@@ -296,7 +311,8 @@ def display_list(title, items, key_prefix):
         bg = "bg-scraped" if is_scraped else "bg-white"
 
         with st.container():
-            c1, c2, c3, c4 = st.columns([0.73, 0.09, 0.09, 0.09])
+            # [수정] 레이아웃 간격 조정 (여백 확보를 위해 컬럼 비율 조정 및 카드 마진 적용)
+            c1, c2, c3, c4 = st.columns([0.70, 0.10, 0.10, 0.10])
             with c1:
                 st.markdown(f'''<div class="news-card {bg}">
                     <div class="news-title">{res["title"]}</div>
@@ -318,7 +334,8 @@ def display_list(title, items, key_prefix):
                         st.session_state.rel_list.append(item_txt)
                         st.toast("🚆 추가되었습니다!"); time.sleep(1.0); st.rerun()
         
-        st.markdown("<hr style='margin: 3px 0; border: none; border-top: 1px solid #f0f0f0;'>", unsafe_allow_html=True)
+        # [수정] 리스트 아이템 간의 간격을 좀 더 벌림
+        st.markdown("<div style='height: 15px;'></div>", unsafe_allow_html=True)
 
 if st.session_state.search_results:
     naver_news = [x for x in st.session_state.search_results if x.get('is_naver')]
