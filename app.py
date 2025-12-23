@@ -67,7 +67,7 @@ class NewsScraper:
             except: break
         return all_results
 
-# --- [3. UI 및 밀착 레이아웃 CSS] ---
+# --- [3. UI 설정 및 밀착 레이아웃 CSS] ---
 st.set_page_config(page_title="또타 스크립터", layout="wide")
 
 st.markdown("""
@@ -81,33 +81,24 @@ st.markdown("""
         min-width: 0px !important;
     }
 
-    /* 버튼 스타일 */
+    /* 버튼 스타일 (기본 및 색상) */
     .stButton > button, .stLinkButton > a {
         width: 100% !important; height: 38px !important;
         font-size: 11px !important; font-weight: 800 !important;
         padding: 0px !important; border-radius: 4px !important;
     }
-
-    /* 버튼 색상: 파스텔 블루 / 파스텔 연두 */
     div[data-testid="column"]:nth-of-type(3) button { background-color: #D1E9FF !important; color: #004085 !important; border: 1px solid #B8DAFF !important; }
     div[data-testid="column"]:nth-of-type(4) button { background-color: #E2F0D9 !important; color: #385723 !important; border: 1px solid #C5E0B4 !important; }
 
-    /* 뉴스 카드 기본 스타일 */
-    .news-card {
-        padding: 10px; border-radius: 8px;
-        border-left: 5px solid #007bff; box-shadow: 0 1px 2px rgba(0,0,0,0.1);
-        width: 100%;
-    }
-    /* 스크랩 전 배경 */
+    /* 뉴스 카드 및 배경색 */
+    .news-card { padding: 10px; border-radius: 8px; border-left: 5px solid #007bff; box-shadow: 0 1px 2px rgba(0,0,0,0.1); width: 100%; }
     .bg-white { background: white !important; }
-    /* 스크랩 후 배경 */
     .bg-scraped { background: #F0F2F6 !important; border-left: 5px solid #999 !important; opacity: 0.8; }
-
-    .news-title { 
-        font-size: 13px !important; font-weight: 700; color: #111; line-height: 1.3;
-        white-space: normal !important; word-break: keep-all;
-    }
+    .news-title { font-size: 13px !important; font-weight: 700; color: #111; line-height: 1.3; }
     .news-meta { font-size: 9px !important; color: #666; margin-top: 2px; }
+
+    /* 개별 삭제 버튼 전용 스타일 */
+    .del-btn button { background-color: #ffebee !important; color: #c62828 !important; border: none !important; height: 25px !important; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -121,22 +112,44 @@ st.title("🚇 또타 스크립터")
 t_date = get_target_date()
 date_header = f"<{t_date.month}월 {t_date.day}일 조간 스크랩>"
 final_output = f"{date_header}\n\n[공사 관련 보도]\n" + "".join(st.session_state.corp_list) + "\n[유관기관 관련 보도]\n" + "".join(st.session_state.rel_list)
-st.text_area("📋 스크랩 결과", value=final_output, height=150)
 
+# 결과창 자동 높이 계산
+dynamic_height = max(180, (final_output.count('\n') + 1) * 25)
+st.text_area("📋 스크랩 결과 (전체 텍스트)", value=final_output, height=dynamic_height)
+
+# 복사 및 전체 초기화 버튼
 c_a, c_b = st.columns(2)
 with c_a:
     if st.button("📋 복사", use_container_width=True):
         st.toast("복사 완료!")
         components.html(f"<script>navigator.clipboard.writeText(`{final_output}`);</script>", height=0)
 with c_b:
-    if st.button("🗑️ 초기화", use_container_width=True):
+    if st.button("🗑️ 전체 초기화", use_container_width=True):
         st.session_state.corp_list, st.session_state.rel_list = [], []
         st.rerun()
 
+# [추가 기능] 스크랩 항목 개별 관리 (삭제)
+with st.expander("🛠️ 스크랩 항목 개별 관리", expanded=False):
+    st.write("**🏢 공사 보도 목록**")
+    for idx, item in enumerate(st.session_state.corp_list):
+        col_txt, col_del = st.columns([0.85, 0.15])
+        col_txt.caption(item.split('\n')[0]) # 제목만 표시
+        if col_del.button("삭제", key=f"del_c_{idx}"):
+            st.session_state.corp_list.pop(idx)
+            st.rerun()
+    
+    st.write("**🚆 유관기관 보도 목록**")
+    for idx, item in enumerate(st.session_state.rel_list):
+        col_txt, col_del = st.columns([0.85, 0.15])
+        col_txt.caption(item.split('\n')[0])
+        if col_del.button("삭제", key=f"del_r_{idx}"):
+            st.session_state.rel_list.pop(idx)
+            st.rerun()
+
 st.divider()
 
-# 2. 검색 설정
-with st.expander("🔍 검색 및 날짜 설정", expanded=True):
+# 2. 검색 및 날짜 설정
+with st.expander("🔍 뉴스 검색 설정", expanded=True):
     keyword = st.text_input("검색어", value="서울교통공사")
     col_d1, col_d2 = st.columns(2)
     with col_d1: start_d = st.date_input("시작일", datetime.date.today() - datetime.timedelta(days=1))
@@ -146,10 +159,9 @@ with st.expander("🔍 검색 및 날짜 설정", expanded=True):
         st.session_state.search_results = NewsScraper().fetch_news(start_d, end_d, keyword, max_a)
         st.rerun()
 
-# 3. 뉴스 리스트 출력 (색상 반전 로직 적용)
+# 3. 뉴스 리스트 (밀착 레이아웃 + 상태 시각화)
 if st.session_state.search_results:
     for i, res in enumerate(st.session_state.search_results):
-        # 스크랩 여부 확인용 문자열 생성
         item_check = f"ㅇ {res['title']}_{res['press']}\n{res['link']}\n\n"
         is_scraped = (item_check in st.session_state.corp_list) or (item_check in st.session_state.rel_list)
         bg_class = "bg-scraped" if is_scraped else "bg-white"
@@ -169,18 +181,12 @@ if st.session_state.search_results:
                 if st.button("공사+", key=f"c_{i}"):
                     if item_check not in st.session_state.corp_list:
                         st.session_state.corp_list.append(item_check)
-                        st.toast("🏢 공사 추가 완료!")
-                        time.sleep(0.3)
-                        st.rerun()
-                    else:
-                        st.toast("⚠️ 이미 추가된 기사입니다.")
+                        st.toast("🏢 공사 추가 완료!"); time.sleep(0.3); st.rerun()
+                    else: st.toast("⚠️ 이미 추가됨")
             with col4:
                 if st.button("유관+", key=f"r_{i}"):
                     if item_check not in st.session_state.rel_list:
                         st.session_state.rel_list.append(item_check)
-                        st.toast("🚆 유관 추가 완료!")
-                        time.sleep(0.3)
-                        st.rerun()
-                    else:
-                        st.toast("⚠️ 이미 추가된 기사입니다.")
+                        st.toast("🚆 유관 추가 완료!"); time.sleep(0.3); st.rerun()
+                    else: st.toast("⚠️ 이미 추가됨")
         st.write("")
