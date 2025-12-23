@@ -23,10 +23,9 @@ def get_target_date():
         target += datetime.timedelta(days=1)
     return target
 
-# --- [2. 뉴스 스크래퍼 (CloudScraper + DOM탐색 + Progress Bar)] ---
+# --- [2. 뉴스 스크래퍼 (시간 파싱 기능 추가)] ---
 class NewsScraper:
     def __init__(self):
-        # 봇 탐지 우회용 설정
         self.scraper = cloudscraper.create_scraper()
         self.headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -43,23 +42,20 @@ class NewsScraper:
         query = f'"{keyword}"'
         max_pages = (max_articles // 10) + 1
         
-        # [요청하신 부분] 진행상황 표시 UI 초기화
+        # 진행상황 UI
         progress_text = "뉴스 수집을 시작합니다..."
         status_text = st.empty()
         progress_bar = st.progress(0)
         status_text.text(progress_text)
-
-        # 로그 컨테이너 (에러 확인용)
         log_container = st.container()
 
         for page in range(1, max_pages + 1):
-            # 목표 수량 채우면 중단
             if len(all_results) >= max_articles: break
             
-            # [업데이트] 진행률 바 및 텍스트 갱신
+            # 진행률 업데이트
             current_progress = min(page / max_pages, 1.0)
             progress_bar.progress(current_progress)
-            status_text.text(f"⏳ {page}/{max_pages}페이지 분석 중... (현재 수집된 기사: {len(all_results)}건)")
+            status_text.text(f"⏳ {page}/{max_pages}페이지 분석 중... (현재 {len(all_results)}건)")
             
             start_index = (page - 1) * 10 + 1
             url = f"https://search.naver.com/search.naver?where=news&query={query}&sm=tab_pge&sort=1&photo=0&pd=3&ds={ds}&de={de}&nso={nso}&start={start_index}"
@@ -72,15 +68,13 @@ class NewsScraper:
 
                 soup = BeautifulSoup(response.content, 'html.parser')
                 
-                # 1차 시도: data-heatmap-target (일반적인 경우)
+                # 1차 시도
                 items = soup.select('a[data-heatmap-target=".tit"]')
-                
-                # 2차 시도: news_tit (백업)
-                if not items:
-                    items = soup.select('a.news_tit')
+                # 2차 시도 (백업)
+                if not items: items = soup.select('a.news_tit')
                 
                 if not items:
-                    with log_container: st.warning(f"⚠️ {page}페이지: 기사를 찾을 수 없습니다. (검색 끝 또는 차단)")
+                    with log_container: st.warning(f"⚠️ {page}페이지: 기사를 찾을 수 없습니다.")
                     break
 
                 for t_tag in items:
@@ -89,7 +83,7 @@ class NewsScraper:
                     title = t_tag.get_text(strip=True)
                     original_link = t_tag.get('href')
                     
-                    # [파싱 로직] 부모 요소 타고 올라가서 카드 컨테이너 찾기
+                    # 부모 카드 찾기
                     card = None
                     curr = t_tag
                     for _ in range(5):
@@ -103,27 +97,36 @@ class NewsScraper:
                     is_naver = "n.news.naver.com" in original_link
                     press_name = "알 수 없음"
                     paper_info = ""
+                    article_date = "" # 기사 날짜 저장 변수
 
                     if card:
-                        # 네이버 뉴스 링크 찾기
+                        # 1. 네이버 뉴스 링크
                         naver_btn = card.select_one('a[href*="n.news.naver.com"]')
                         if naver_btn:
                             final_link = naver_btn.get('href')
                             is_naver = True
                         
-                        # 언론사 이름
+                        # 2. 언론사 이름
                         press_el = card.select_one(".sds-comps-profile-info-title-text, .press_name, .info.press")
                         if press_el:
                             press_name = press_el.get_text(strip=True)
                         
-                        # 지면 정보 (A1면 등)
-                        subtext_area = card.select(".sds-comps-profile-info-subtexts span, .info")
-                        for sub in subtext_area:
-                            txt = sub.get_text(strip=True)
-                            if re.search(r'[A-Za-z]*\d+면', txt):
+                        # 3. [중요] 날짜 및 지면 정보 파싱
+                        # .info 또는 .subtexts 안의 span들을 모두 확인
+                        info_spans = card.select(".info, .subtexts span")
+                        for span in info_spans:
+                            txt = span.get_text(strip=True)
+                            
+                            # (A) 날짜 패턴 확인 (방금 전, 1분 전, 1시간 전, 1일 전, 2024.12.23.)
+                            # 정규식: 숫자+분/시/일/주 전 OR YYYY.MM.DD. 패턴
+                            if re.search(r'(\d+[분시일주]\s?전|방금\s?전|\d{4}\.\d{2}\.\d{2}\.?)', txt):
+                                article_date = txt
+                            
+                            # (B) 지면 정보 확인
+                            elif re.search(r'[A-Za-z]*\d+면', txt):
                                 paper_info = f" ({txt})"
-                                break
 
+                    # 제목 합치기 (지면정보 포함)
                     full_title = f"{title}{paper_info}"
 
                     if final_link in seen_links: continue
@@ -133,18 +136,18 @@ class NewsScraper:
                         'title': full_title,
                         'link': final_link,
                         'press': press_name,
-                        'is_naver': is_naver
+                        'is_naver': is_naver,
+                        'date': article_date  # 날짜 정보 추가
                     })
                     
-                time.sleep(0.5) # 딜레이
+                time.sleep(0.3)
                 
             except Exception as e:
                 with log_container: st.error(f"Error on page {page}: {e}")
                 continue
         
-        # [완료 후 정리]
         progress_bar.progress(1.0)
-        status_text.success(f"✅ 수집 완료! 총 {len(all_results)}건을 찾았습니다.")
+        status_text.success(f"✅ 수집 완료! 총 {len(all_results)}건")
         time.sleep(1)
         progress_bar.empty()
         status_text.empty()
@@ -221,7 +224,6 @@ with st.expander("🔍 뉴스 검색 설정", expanded=True):
     with d2: end_d = st.date_input("종료일", datetime.date.today())
     max_a = st.slider("최대 기사 수", 10, 100, 30)
     
-    # [핵심] st.rerun 제거 + 진행률 표시를 위해 fetch_news 호출
     if st.button("🚀 뉴스 검색 시작", type="primary", use_container_width=True):
         st.session_state.search_results = NewsScraper().fetch_news(start_d, end_d, keyword, max_a)
 
@@ -233,7 +235,10 @@ def display_list(title, items, key_prefix):
         return
 
     for i, res in enumerate(items):
-        item_txt = f"ㅇ {res['title']}_{res['press']}\n{res['link']}\n\n"
+        # [수정] 스크랩 텍스트에 날짜 정보 추가: [날짜] 제목_언론사
+        date_str = f"[{res['date']}] " if res['date'] else ""
+        item_txt = f"ㅇ {date_str}{res['title']}_{res['press']}\n{res['link']}\n\n"
+        
         is_scraped = (item_txt in st.session_state.corp_list) or (item_txt in st.session_state.rel_list)
         bg = "bg-scraped" if is_scraped else "bg-white"
 
@@ -242,7 +247,10 @@ def display_list(title, items, key_prefix):
             with c1:
                 st.markdown(f'''<div class="news-card {bg}">
                     <div class="news-title">{res["title"]}</div>
-                    <div class="news-meta">[{res["press"]}] {"(스크랩됨)" if is_scraped else ""}</div>
+                    <div class="news-meta">
+                        <span style="color: #007bff; font-weight: bold;">{res['date']}</span>
+                        [{res["press"]}] {"(스크랩됨)" if is_scraped else ""}
+                    </div>
                 </div>''', unsafe_allow_html=True)
             with c2: st.link_button("원문", res['link'])
             with c3:
