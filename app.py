@@ -23,7 +23,7 @@ def get_target_date():
         target += datetime.timedelta(days=1)
     return target
 
-# --- [2. 뉴스 스크래퍼 (날짜 파싱 강화 Ver)] ---
+# --- [2. 뉴스 스크래퍼 (날짜 파싱 강력 강화 Ver)] ---
 class NewsScraper:
     def __init__(self):
         self.scraper = cloudscraper.create_scraper()
@@ -111,30 +111,25 @@ class NewsScraper:
                         if press_el:
                             press_name = press_el.get_text(strip=True)
                         
-                        # 3. [핵심 수정] 날짜 및 지면 정보 파싱 (텍스트 전체 스캔 방식)
-                        # 카드 안의 모든 텍스트를 검사하는 대신, 정보 영역만 타겟팅합니다.
-                        # .info_group: PC/구버전, .sds...: 모바일/신버전
-                        info_areas = card.select(".info_group, .news_info, .sds-comps-profile-info-subtexts, .info")
+                        # 3. [강력해진 날짜 파싱]
+                        # 카드 내의 모든 텍스트를 긁어서 날짜 패턴을 찾습니다.
+                        # (태그 구조가 복잡해도 텍스트는 무조건 있기 때문)
+                        full_text = card.get_text(separator=" ", strip=True)
                         
-                        # 만약 위 영역을 못 찾으면 카드 전체 텍스트에서 찾습니다 (최후의 수단)
-                        if not info_areas:
-                            info_areas = [card]
+                        # (A) "OO 전" 패턴 찾기 (1시간 전, 2분 전, 방금 전 등)
+                        date_match = re.search(r'(\d+[분시일주]\s?전|방금\s?전)', full_text)
+                        if date_match:
+                            article_date = date_match.group(1)
+                        else:
+                            # (B) YYYY.MM.DD 패턴 찾기
+                            date_match_2 = re.search(r'(\d{4}\.\d{2}\.\d{2}\.?)', full_text)
+                            if date_match_2:
+                                article_date = date_match_2.group(1)
 
-                        for area in info_areas:
-                            # 영역 내의 텍스트를 추출
-                            area_text = area.get_text(separator=" ", strip=True)
-                            
-                            # (A) 날짜 패턴 찾기 (우선순위: 분/시/일 전 > YYYY.MM.DD)
-                            if not article_date:
-                                date_match = re.search(r'(\d+[분시일주]\s?전|방금\s?전|\d{4}\.\d{2}\.\d{2}\.?)', area_text)
-                                if date_match:
-                                    article_date = date_match.group(1)
-                            
-                            # (B) 지면 정보 찾기
-                            if not paper_info:
-                                paper_match = re.search(r'([A-Za-z]*\d+면)', area_text)
-                                if paper_match:
-                                    paper_info = f" ({paper_match.group(1)})"
+                        # 4. 지면 정보 파싱 (A1면 등)
+                        paper_match = re.search(r'([A-Za-z]*\d+면)', full_text)
+                        if paper_match:
+                            paper_info = f" ({paper_match.group(1)})"
 
                     full_title = f"{title}{paper_info}"
 
@@ -146,7 +141,7 @@ class NewsScraper:
                         'link': final_link,
                         'press': press_name,
                         'is_naver': is_naver,
-                        'date': article_date
+                        'date': article_date # 찾아낸 날짜 저장
                     })
                     
                 time.sleep(0.3)
@@ -244,8 +239,11 @@ def display_list(title, items, key_prefix):
         return
 
     for i, res in enumerate(items):
-        date_val = res.get('date', '')
+        # [수정] 날짜 정보가 있으면 가져오고, 없으면 빈칸
+        date_val = res.get('date', '') 
         date_str = f"[{date_val}] " if date_val else ""
+        
+        # 스크랩 목록에 넣을 텍스트
         item_txt = f"ㅇ {date_str}{res['title']}_{res['press']}\n{res['link']}\n\n"
         
         is_scraped = (item_txt in st.session_state.corp_list) or (item_txt in st.session_state.rel_list)
