@@ -3,168 +3,256 @@ import cloudscraper
 from bs4 import BeautifulSoup
 import datetime
 import time
+import re
+import streamlit.components.v1 as components
 
-# --- [뉴스 스크래퍼 클래스] ---
+# --- [1. 스마트 날짜 계산 함수] ---
+def get_target_date():
+    today = datetime.date.today()
+    if today.weekday() == 4: target = today + datetime.timedelta(days=3)
+    elif today.weekday() == 5: target = today + datetime.timedelta(days=2)
+    else: target = today + datetime.timedelta(days=1)
+
+    holidays = [
+        datetime.date(2025,1,1), datetime.date(2025,1,28), datetime.date(2025,1,29), datetime.date(2025,1,30),
+        datetime.date(2025,3,1), datetime.date(2025,3,3), datetime.date(2025,5,5), datetime.date(2025,5,6),
+        datetime.date(2025,6,6), datetime.date(2025,8,15), datetime.date(2025,10,3), datetime.date(2025,10,5),
+        datetime.date(2025,10,6), datetime.date(2025,10,7), datetime.date(2025,10,8), datetime.date(2025,10,9), datetime.date(2025,12,25),
+    ]
+    while target in holidays or target.weekday() >= 5:
+        target += datetime.timedelta(days=1)
+    return target
+
+# --- [2. 뉴스 스크래퍼 (제공해주신 로직 적용)] ---
 class NewsScraper:
-    def fetch_news(self, start_datetime, end_datetime, keyword, photo_value):
-        ds, de = start_datetime.strftime("%Y.%m.%d"), end_datetime.strftime("%Y.%m.%d")
-        nso = f"so:dd,p:from{start_datetime.strftime('%Y%m%d')}to{end_datetime.strftime('%Y%m%d')}"
-        
-        all_results = []
-        seen_links = set()
-        scraper = cloudscraper.create_scraper()
-        headers = {
+    def __init__(self):
+        # cloudscraper 초기화
+        self.scraper = cloudscraper.create_scraper()
+        self.headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
             'Referer': 'https://www.naver.com/'
         }
 
+    def fetch_news(self, start_d, end_d, keyword, max_articles):
+        ds, de = start_d.strftime("%Y.%m.%d"), end_d.strftime("%Y.%m.%d")
+        nso = f"so:dd,p:from{start_d.strftime('%Y%m%d')}to{end_d.strftime('%Y%m%d')}"
+        
+        all_results = []
+        seen_links = set()
+        
         query = f'"{keyword}"'
-        for page in range(1, 6):
+        max_pages = (max_articles // 10) + 1
+        
+        # 로그 및 상태창
+        log_container = st.container()
+        status_text = st.empty()
+
+        with log_container:
+            st.info(f"🚀 스크랩 시작 (CloudScraper): {keyword}")
+
+        for page in range(1, max_pages + 1):
+            if len(all_results) >= max_articles: break
+            
             start_index = (page - 1) * 10 + 1
-            url = f"https://search.naver.com/search.naver?where=news&query={query}&sm=tab_pge&sort=1&photo={photo_value}&pd=3&ds={ds}&de={de}&nso={nso}&start={start_index}"
+            url = f"https://search.naver.com/search.naver?where=news&query={query}&sm=tab_pge&sort=1&photo=0&pd=3&ds={ds}&de={de}&nso={nso}&start={start_index}"
+            
+            status_text.text(f"⏳ {page}페이지 분석 중... (현재 {len(all_results)}건)")
             
             try:
-                response = scraper.get(url, headers=headers, timeout=10)
+                response = self.scraper.get(url, headers=self.headers, timeout=10)
+                if response.status_code != 200:
+                    with log_container: st.error(f"❌ 접속 실패: {response.status_code}")
+                    continue
+
                 soup = BeautifulSoup(response.content, 'html.parser')
+                
+                # [핵심] 제공해주신 선택자: data-heatmap-target=".tit"
                 items = soup.select('a[data-heatmap-target=".tit"]')
-                if not items: break
+                
+                if not items:
+                    # 백업: tit 선택자가 없을 경우 news_tit 시도
+                    items = soup.select('a.news_tit')
+                    if not items:
+                        with log_container: st.warning(f"⚠️ {page}페이지: 뉴스 항목을 찾지 못했습니다.")
+                        continue
 
                 for t_tag in items:
+                    if len(all_results) >= max_articles: break
+
                     title = t_tag.get_text(strip=True)
                     original_link = t_tag.get('href')
                     
+                    # [로직 적용] 부모 요소를 타고 올라가서 카드(Card) 컨테이너 찾기
                     card = None
                     curr = t_tag
-                    for _ in range(5):
+                    for _ in range(5): # 최대 5단계 상위로 탐색
                         if curr.parent:
                             curr = curr.parent
-                            if curr.select_one(".sds-comps-profile") or curr.select_one(".news_info"):
+                            # 네이버 뉴스 구조상 bx, news_wrap, sds-comps-profile 등이 카드 컨테이너임
+                            if curr.select_one(".sds-comps-profile") or curr.select_one(".news_info") or 'bx' in curr.get('class', []):
                                 card = curr
                                 break
                     
                     final_link = original_link
                     is_naver = "n.news.naver.com" in original_link
                     press_name = "알 수 없음"
-                    date_text = "정보 없음"
+                    paper_info = "" # 지면 정보
 
                     if card:
+                        # 1. 네이버 뉴스 링크 찾기
+                        # href에 n.news.naver.com이 포함된 a 태그 탐색
                         naver_btn = card.select_one('a[href*="n.news.naver.com"]')
                         if naver_btn:
-                            final_link = naver_btn.get('href'); is_naver = True
+                            final_link = naver_btn.get('href')
+                            is_naver = True
+                        
+                        # 2. 언론사 이름 찾기
                         press_el = card.select_one(".sds-comps-profile-info-title-text, .press_name, .info.press")
-                        if press_el: press_name = press_el.get_text(strip=True)
-                        subtext_area = card.select_one(".sds-comps-profile-info-subtexts, .news_info")
-                        if subtext_area:
-                            for txt in subtext_area.stripped_strings:
-                                if ('전' in txt and len(txt) < 15) or ('.' in txt and len(txt) < 15 and txt[0].isdigit()):
-                                    date_text = txt; break
+                        if press_el:
+                            press_name = press_el.get_text(strip=True)
+                        
+                        # 3. 부가 정보 (지면 정보 등) 찾기
+                        # subtext_area나 .info 안의 텍스트 확인
+                        subtext_area = card.select(".sds-comps-profile-info-subtexts span, .info")
+                        for sub in subtext_area:
+                            txt = sub.get_text(strip=True)
+                            # "A1면", "1면" 패턴 찾기
+                            if re.search(r'[A-Za-z]*\d+면', txt):
+                                paper_info = f" ({txt})"
+                                break # 지면 정보 찾으면 중단
 
+                    # 제목에 지면 정보 합치기
+                    full_title = f"{title}{paper_info}"
+
+                    # 중복 제거
                     if final_link in seen_links: continue
                     seen_links.add(final_link)
-                    all_results.append({'title': title, 'link': final_link, 'press': press_name, 'time': date_text, 'is_naver': is_naver})
-                time.sleep(0.3)
-            except: break
+                    
+                    all_results.append({
+                        'title': full_title,
+                        'link': final_link,
+                        'press': press_name,
+                        'is_naver': is_naver
+                    })
+                    
+                time.sleep(0.3) # 봇 탐지 방지 딜레이
+                
+            except Exception as e:
+                with log_container: st.error(f"Error on page {page}: {e}")
+                continue
+        
+        status_text.empty()
         return all_results
 
-# --- [Streamlit 웹 UI] ---
-st.set_page_config(page_title="서울교통공사 스크랩", layout="wide")
+# --- [3. UI 설정] ---
+st.set_page_config(page_title="Totta Scraper", layout="wide")
 
-# 버튼 스타일 통일 및 카드 디자인 CSS
 st.markdown("""
     <style>
-    /* 모든 버튼 스타일 통일 */
-    .stButton > button, .stLinkButton > a {
-        display: inline-flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-        width: 100% !important;
-        height: 40px !important;
-        background-color: #f0f2f6 !important;
-        color: #31333F !important;
-        border: 1px solid #d1d5db !important;
-        border-radius: 8px !important;
-        text-decoration: none !important;
-        font-size: 14px !important;
-        font-weight: 500 !important;
-        margin: 0 !important;
-    }
-    .stButton > button:hover, .stLinkButton > a:hover {
-        border-color: #007bff !important;
-        color: #007bff !important;
-        background-color: #e7f3ff !important;
-    }
-    .news-card {
-        background: white;
-        padding: 14px;
-        border-radius: 10px;
-        border-left: 6px solid #007bff;
-        margin-bottom: 8px;
-        box-shadow: 0 2px 5px rgba(0,0,0,0.05);
-    }
+    [data-testid="stHorizontalBlock"] { gap: 4px !important; align-items: center !important; }
+    div[data-testid="column"], div[data-testid="stColumn"] { padding: 0px !important; display: flex !important; justify-content: center !important; }
+    .stButton > button { width: 100% !important; height: 38px !important; border-radius: 6px !important; }
+    .stLinkButton > a { width: 100% !important; height: 38px !important; display: flex; align-items: center; justify-content: center; font-size: 11px !important; }
+    
+    .news-card { padding: 8px 12px; border-radius: 6px; border-left: 4px solid #007bff; box-shadow: 0 1px 1px rgba(0,0,0,0.05); display: flex; flex-direction: column; justify-content: center; height: 100%; }
+    .bg-scraped { background: #eee !important; border-left: 4px solid #888 !important; opacity: 0.7; }
+    .bg-white { background: white !important; }
+    .news-title { font-size: 16px !important; font-weight: 600; color: #333; line-height: 1.2; margin-bottom: 2px; }
+    .news-meta { font-size: 13px !important; color: #666; }
+    .section-header { font-size: 18px; font-weight: 700; color: #333; margin-top: 20px; margin-bottom: 10px; border-bottom: 2px solid #007bff; display: inline-block; }
+    
+    div[data-testid="stHorizontalBlock"] > div:nth-child(3) button { background-color: #e3f2fd !important; color: #1565c0 !important; border: 1px solid #90caf9 !important; }
+    div[data-testid="stHorizontalBlock"] > div:nth-child(4) button { background-color: #e8f5e9 !important; color: #2e7d32 !important; border: 1px solid #a5d6a7 !important; }
     </style>
     """, unsafe_allow_html=True)
 
-if 'scrap_list' not in st.session_state: st.session_state.scrap_list = []
-if 'search_results' not in st.session_state: st.session_state.search_results = []
+# 세션 초기화
+for key in ['corp_list', 'rel_list', 'search_results']:
+    if key not in st.session_state: st.session_state[key] = []
 
-st.title("🚇 뉴스 스크랩 (Mobile)")
+st.title("🚇 또타 스크립터 (Smart Parse)")
 
-# 1. 스크랩 목록 (최상단, 가변형)
-st.subheader("📋 실시간 스크랩 목록")
-if st.session_state.scrap_list:
-    final_text = "".join(st.session_state.scrap_list)
-    # 기사 개수에 따라 높이 조절 (최소 150, 최대 400)
-    list_height = min(max(150, len(st.session_state.scrap_list) * 45), 450)
-    st.text_area("내용 복사", value=final_text, height=list_height)
-    if st.button("🗑️ 목록 비우기"):
-        st.session_state.scrap_list = []
+# 1. 결과 영역
+t_date = get_target_date()
+date_header = f"<{t_date.month}월 {t_date.day}일 조간 스크랩>"
+final_output = f"{date_header}\n\n[공사 관련 보도]\n" + "".join(st.session_state.corp_list) + "\n[유관기관 관련 보도]\n" + "".join(st.session_state.rel_list)
+
+st.text_area("📋 스크랩 결과", value=final_output, height=max(180, (final_output.count('\n') + 1) * 25))
+
+c1, c2 = st.columns(2)
+with c1:
+    if st.button("📋 텍스트 복사", use_container_width=True):
+        st.toast("복사 완료!")
+        components.html(f"<script>navigator.clipboard.writeText(`{final_output}`);</script>", height=0)
+with c2:
+    if st.button("🗑️ 초기화", use_container_width=True):
+        st.session_state.corp_list, st.session_state.rel_list = [], []
         st.rerun()
-else:
-    st.info("검색 후 '➕ 추가' 버튼을 눌러 기사를 담으세요.")
+
+# 개별 관리
+with st.expander("🛠️ 스크랩 항목 관리", expanded=False):
+    st.write("**🏢 공사 보도**")
+    for idx, item in enumerate(st.session_state.corp_list):
+        ct, cd = st.columns([0.85, 0.15])
+        with ct: st.caption(item.split('\n')[0])
+        with cd: 
+            if st.button("삭제", key=f"d_c_{idx}"): st.session_state.corp_list.pop(idx); st.rerun()
+    st.write("**🚆 유관기관 보도**")
+    for idx, item in enumerate(st.session_state.rel_list):
+        ct, cd = st.columns([0.85, 0.15])
+        with ct: st.caption(item.split('\n')[0])
+        with cd:
+            if st.button("삭제", key=f"d_r_{idx}"): st.session_state.rel_list.pop(idx); st.rerun()
 
 st.divider()
 
 # 2. 검색 설정
-with st.expander("🔍 검색 조건", expanded=True):
-    keyword = st.text_input("키워드", value="서울교통공사")
-    col1, col2 = st.columns(2)
-    with col1: start_date = st.date_input("시작", datetime.date.today() - datetime.timedelta(days=1))
-    with col2: end_date = st.date_input("종료", datetime.date.today())
-    filter_choice = st.radio("검색 범위", ["네이버 기사", "언론사 자체기사", "모두 보기"], index=0, horizontal=True)
+with st.expander("🔍 뉴스 검색 설정", expanded=True):
+    keyword = st.text_input("검색어", value="서울교통공사")
+    d1, d2 = st.columns(2)
+    with d1: start_d = st.date_input("시작일", datetime.date.today() - datetime.timedelta(days=1))
+    with d2: end_d = st.date_input("종료일", datetime.date.today())
+    max_a = st.slider("최대 기사 수", 10, 100, 30)
+    
+    if st.button("🚀 뉴스 검색 시작", type="primary", use_container_width=True):
+        st.session_state.search_results = NewsScraper().fetch_news(start_d, end_d, keyword, max_a)
 
-if st.button("🚀 뉴스 검색 실행", type="primary"):
-    scraper = NewsScraper()
-    with st.spinner('검색 중...'):
-        results = scraper.fetch_news(start_date, end_date, keyword, 0)
-        st.session_state.search_results = results
+# 3. 뉴스 리스트 출력
+def display_list(title, items, key_prefix):
+    st.markdown(f'<div class="section-header">{title} ({len(items)}건)</div>', unsafe_allow_html=True)
+    if not items:
+        st.caption("기사가 없습니다.")
+        return
 
-# 3. 검색 결과
-if st.session_state.search_results:
-    if filter_choice == "네이버 기사":
-        display_results = [r for r in st.session_state.search_results if r['is_naver']]
-    elif filter_choice == "언론사 자체기사":
-        display_results = [r for r in st.session_state.search_results if not r['is_naver']]
-    else:
-        display_results = st.session_state.search_results
+    for i, res in enumerate(items):
+        item_txt = f"ㅇ {res['title']}_{res['press']}\n{res['link']}\n\n"
+        is_scraped = (item_txt in st.session_state.corp_list) or (item_txt in st.session_state.rel_list)
+        bg = "bg-scraped" if is_scraped else "bg-white"
 
-    st.subheader(f"✅ 결과: {len(display_results)}건")
-    for i, res in enumerate(display_results):
         with st.container():
-            st.markdown(f"""
-            <div class="news-card">
-                <strong>[{res['press']}]</strong> {res['title']}<br>
-                <small style="color:gray;">{res['time']} {'(네이버)' if res['is_naver'] else ''}</small>
-            </div>
-            """, unsafe_allow_html=True)
-            
-            # 버튼 가로 배치 (디자인 통일)
-            btn_col1, btn_col2 = st.columns(2)
-            with btn_col1:
-                st.link_button("🔗 원문보기", res['link'])
-            with btn_col2:
-                if st.button("➕ 추가", key=f"add_{i}"):
-                    item = f"ㅇ {res['title']}_{res['press']}\n{res['link']}\n\n"
-                    if item not in st.session_state.scrap_list:
-                        st.session_state.scrap_list.append(item)
-                        st.toast("추가되었습니다!")
-                        st.rerun()
+            c1, c2, c3, c4 = st.columns([0.73, 0.09, 0.09, 0.09])
+            with c1:
+                st.markdown(f'''<div class="news-card {bg}">
+                    <div class="news-title">{res["title"]}</div>
+                    <div class="news-meta">[{res["press"]}] {"(스크랩됨)" if is_scraped else ""}</div>
+                </div>''', unsafe_allow_html=True)
+            with c2: st.link_button("원문", res['link'])
+            with c3:
+                if st.button("공사", key=f"c_{key_prefix}_{i}"):
+                    if item_txt not in st.session_state.corp_list:
+                        st.session_state.corp_list.append(item_txt)
+                        st.toast("🏢 추가됨"); time.sleep(0.1); st.rerun()
+            with c4:
+                if st.button("유관", key=f"r_{key_prefix}_{i}"):
+                    if item_txt not in st.session_state.rel_list:
+                        st.session_state.rel_list.append(item_txt)
+                        st.toast("🚆 추가됨"); time.sleep(0.1); st.rerun()
+        st.markdown("<hr style='margin: 3px 0; border: none; border-top: 1px solid #f0f0f0;'>", unsafe_allow_html=True)
+
+if st.session_state.search_results:
+    naver_news = [x for x in st.session_state.search_results if x['is_naver']]
+    other_news = [x for x in st.session_state.search_results if not x['is_naver']]
+    
+    display_list("🟢 네이버 뉴스", naver_news, "n")
+    st.write("")
+    display_list("🌐 언론사 자체 기사", other_news, "o")
