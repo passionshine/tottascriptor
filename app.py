@@ -242,8 +242,8 @@ def display_list(title, items, key_p):
                     if st.button("공사 기사", key=f"c_{key_p}_{i}", use_container_width=True):
                         if item_txt not in st.session_state.corp_list:
                             st.session_state.corp_list.append(item_txt)
-                            st.toast("🏢 공사 관련 보도로 스크랩되었습니다!", icon="✅")
-                            time.sleep(0.5)
+                            st.toast("공사 관련 보도로 스크랩되었습니다!", icon="✅")
+                            time.sleep(1.0)
                             st.rerun()
                         else:
                             st.toast("⚠️ 이미 스크랩된 기사입니다.", icon="❗")
@@ -251,8 +251,8 @@ def display_list(title, items, key_p):
                     if st.button("기타 기사", key=f"r_{key_p}_{i}", use_container_width=True):
                         if item_txt not in st.session_state.rel_list:
                             st.session_state.rel_list.append(item_txt)
-                            st.toast("🚆 유관기관 관련 보도로 스크랩되었습니다!", icon="✅")
-                            time.sleep(0.5)
+                            st.toast("유관기관 관련 보도로 스크랩되었습니다!", icon="✅")
+                            time.sleep(1.0)
                             st.rerun()
                         else:
                             st.toast("⚠️ 이미 스크랩된 기사입니다.", icon="❗")
@@ -267,3 +267,4 @@ if st.session_state.search_results:
     if p_news: display_list("📰 지면 보도", p_news, "p")
     if n_news: display_list("🟢 네이버 뉴스", n_news, "n")
     if o_news: display_list("🌐 기타 뉴스", o_news, "o")
+
