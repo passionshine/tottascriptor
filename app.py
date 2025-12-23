@@ -153,14 +153,14 @@ st.markdown("""
         box-shadow: 0 2px 4px rgba(0,0,0,0.08); background: white; margin-bottom: 5px;
     }
     .bg-scraped { background: #f8f9fa !important; border-left: 5px solid #adb5bd !important; opacity: 0.7; }
-    .news-title { font-size: 15px !important; font-weight: 700; color: #222; margin-bottom: 5px; line-height: 1.4; }
-    .news-meta { font-size: 12px !important; color: #666; }
+    .news-title { font-size: 17px !important; font-weight: 700; color: #222; margin-bottom: 5px; line-height: 1.4; }
+    .news-meta { font-size: 15px !important; color: #666; }
     
     /* 버튼 스타일 통일 (일반 버튼 + 링크 버튼) */
     .stButton > button, .stLinkButton > a { 
         width: 100% !important; 
         height: 38px !important; 
-        font-size: 13px !important; 
+        font-size: 10px !important; 
         font-weight: 600 !important;
         padding: 0 !important;
         display: flex; align-items: center; justify-content: center;
@@ -274,6 +274,7 @@ if st.session_state.search_results:
     if p_news: display_list("📰 지면 보도", p_news, "p")
     if n_news: display_list("🟢 네이버 뉴스", n_news, "n")
     if o_news: display_list("🌐 언론사 자체 뉴스", o_news, "o")
+
 
 
 
