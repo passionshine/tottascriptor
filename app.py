@@ -34,7 +34,7 @@ def get_target_date():
         target += datetime.timedelta(days=1)
     return target
 
-# --- [2. 뉴스 스크래퍼] ---
+# --- [2. 뉴스 스크립터] ---
 class NewsScraper:
     def __init__(self):
         self.scraper = cloudscraper.create_scraper()
@@ -166,7 +166,7 @@ st.markdown("""
 for key in ['corp_list', 'rel_list', 'search_results']:
     if key not in st.session_state: st.session_state[key] = []
 
-st.title("🚇 또타 뉴스 스크립터")
+st.title("🚇 Totta Scriptor for web")
 
 # 1. 결과 출력 영역
 t_date = get_target_date()
@@ -220,17 +220,17 @@ def display_list(title, items, key_p):
         
         with col_b:
             b1, b2, b3 = st.columns(3)
-            with b1: st.link_button("원문", res['link'])
+            with b1: st.link_button("원문보기", res['link'])
             with b2:
-                if st.button("공사+", key=f"c_{key_p}_{i}"):
+                if st.button("공사보도", key=f"c_{key_p}_{i}"):
                     if item_txt not in st.session_state.corp_list:
                         st.session_state.corp_list.append(item_txt)
-                        st.toast("🏢 공사 추가"); time.sleep(0.5); st.rerun()
+                        st.toast("🏢 공사 관련 보도에 스크랩 되었습니다!"); time.sleep(1.0); st.rerun()
             with b3:
-                if st.button("유관+", key=f"r_{key_p}_{i}"):
+                if st.button("기타보도", key=f"r_{key_p}_{i}"):
                     if item_txt not in st.session_state.rel_list:
                         st.session_state.rel_list.append(item_txt)
-                        st.toast("🚆 유관 추가"); time.sleep(0.5); st.rerun()
+                        st.toast("🚆 유관기관 기타 보도에 스크랩 되었습니다!"); time.sleep(1.0); st.rerun()
 
 # 분류 후 출력
 if st.session_state.search_results:
@@ -242,3 +242,4 @@ if st.session_state.search_results:
     if p_news: display_list("📰 지면 보도", p_news, "p")
     if n_news: display_list("🟢 네이버 뉴스", n_news, "n")
     if o_news: display_list("🌐 기타 뉴스", o_news, "o")
+
