@@ -23,7 +23,7 @@ def get_target_date():
         target += datetime.timedelta(days=1)
     return target
 
-# --- [2. 뉴스 스크래퍼 (시간 파싱 기능 추가)] ---
+# --- [2. 뉴스 스크래퍼 (통합 버전)] ---
 class NewsScraper:
     def __init__(self):
         self.scraper = cloudscraper.create_scraper()
@@ -43,11 +43,11 @@ class NewsScraper:
         max_pages = (max_articles // 10) + 1
         
         # 진행상황 UI
-        progress_text = "뉴스 수집을 시작합니다..."
         status_text = st.empty()
         progress_bar = st.progress(0)
-        status_text.text(progress_text)
         log_container = st.container()
+
+        status_text.text("뉴스 수집 시작...")
 
         for page in range(1, max_pages + 1):
             if len(all_results) >= max_articles: break
@@ -70,7 +70,7 @@ class NewsScraper:
                 
                 # 1차 시도
                 items = soup.select('a[data-heatmap-target=".tit"]')
-                # 2차 시도 (백업)
+                # 2차 시도
                 if not items: items = soup.select('a.news_tit')
                 
                 if not items:
@@ -83,7 +83,7 @@ class NewsScraper:
                     title = t_tag.get_text(strip=True)
                     original_link = t_tag.get('href')
                     
-                    # 부모 카드 찾기
+                    # 부모 카드 찾기 (DOM 탐색)
                     card = None
                     curr = t_tag
                     for _ in range(5):
@@ -97,7 +97,7 @@ class NewsScraper:
                     is_naver = "n.news.naver.com" in original_link
                     press_name = "알 수 없음"
                     paper_info = ""
-                    article_date = "" # 기사 날짜 저장 변수
+                    article_date = ""
 
                     if card:
                         # 1. 네이버 뉴스 링크
@@ -111,22 +111,20 @@ class NewsScraper:
                         if press_el:
                             press_name = press_el.get_text(strip=True)
                         
-                        # 3. [중요] 날짜 및 지면 정보 파싱
-                        # .info 또는 .subtexts 안의 span들을 모두 확인
+                        # 3. 날짜 및 지면 정보 파싱
+                        # span 태그들 모두 확인
                         info_spans = card.select(".info, .subtexts span")
                         for span in info_spans:
                             txt = span.get_text(strip=True)
                             
-                            # (A) 날짜 패턴 확인 (방금 전, 1분 전, 1시간 전, 1일 전, 2024.12.23.)
-                            # 정규식: 숫자+분/시/일/주 전 OR YYYY.MM.DD. 패턴
+                            # 날짜 패턴 (1시간 전, 2024.01.01 등)
                             if re.search(r'(\d+[분시일주]\s?전|방금\s?전|\d{4}\.\d{2}\.\d{2}\.?)', txt):
                                 article_date = txt
                             
-                            # (B) 지면 정보 확인
+                            # 지면 정보 패턴 (A1면 등)
                             elif re.search(r'[A-Za-z]*\d+면', txt):
                                 paper_info = f" ({txt})"
 
-                    # 제목 합치기 (지면정보 포함)
                     full_title = f"{title}{paper_info}"
 
                     if final_link in seen_links: continue
@@ -137,7 +135,7 @@ class NewsScraper:
                         'link': final_link,
                         'press': press_name,
                         'is_naver': is_naver,
-                        'date': article_date  # 날짜 정보 추가
+                        'date': article_date
                     })
                     
                 time.sleep(0.3)
@@ -148,7 +146,7 @@ class NewsScraper:
         
         progress_bar.progress(1.0)
         status_text.success(f"✅ 수집 완료! 총 {len(all_results)}건")
-        time.sleep(1)
+        time.sleep(0.5)
         progress_bar.empty()
         status_text.empty()
         
@@ -180,7 +178,7 @@ st.markdown("""
 for key in ['corp_list', 'rel_list', 'search_results']:
     if key not in st.session_state: st.session_state[key] = []
 
-st.title("🚇 또타 스크립터 (Smart Parse)")
+st.title("🚇 또타 스크립터 (Final Ver)")
 
 # 1. 결과 영역
 t_date = get_target_date()
@@ -235,8 +233,9 @@ def display_list(title, items, key_prefix):
         return
 
     for i, res in enumerate(items):
-        # [수정] 스크랩 텍스트에 날짜 정보 추가: [날짜] 제목_언론사
-        date_str = f"[{res['date']}] " if res['date'] else ""
+        # [수정] .get으로 안전하게 가져오기
+        date_val = res.get('date', '')
+        date_str = f"[{date_val}] " if date_val else ""
         item_txt = f"ㅇ {date_str}{res['title']}_{res['press']}\n{res['link']}\n\n"
         
         is_scraped = (item_txt in st.session_state.corp_list) or (item_txt in st.session_state.rel_list)
@@ -248,21 +247,23 @@ def display_list(title, items, key_prefix):
                 st.markdown(f'''<div class="news-card {bg}">
                     <div class="news-title">{res["title"]}</div>
                     <div class="news-meta">
-                        <span style="color: #007bff; font-weight: bold;">{res['date']}</span>
+                        <span style="color: #007bff; font-weight: bold;">{date_val}</span>
                         [{res["press"]}] {"(스크랩됨)" if is_scraped else ""}
                     </div>
                 </div>''', unsafe_allow_html=True)
             with c2: st.link_button("원문", res['link'])
+            
             with c3:
                 if st.button("공사", key=f"c_{key_prefix}_{i}"):
                     if item_txt not in st.session_state.corp_list:
                         st.session_state.corp_list.append(item_txt)
-                        st.toast("🏢 추가됨"); time.sleep(0.1); st.rerun()
+                        st.toast("🏢 공사 관련 기사에 스크랩되었습니다!"); time.sleep(1.5); st.rerun()
             with c4:
                 if st.button("유관", key=f"r_{key_prefix}_{i}"):
                     if item_txt not in st.session_state.rel_list:
                         st.session_state.rel_list.append(item_txt)
-                        st.toast("🚆 추가됨"); time.sleep(0.1); st.rerun()
+                        st.toast("🚆 유관기관 기타 기사에 스크랩 되었습니다!"); time.sleep(1.5); st.rerun()
+        
         st.markdown("<hr style='margin: 3px 0; border: none; border-top: 1px solid #f0f0f0;'>", unsafe_allow_html=True)
 
 if st.session_state.search_results:
