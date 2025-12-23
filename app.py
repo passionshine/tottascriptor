@@ -189,10 +189,11 @@ if st.session_state.search_results:
                 st.link_button("원문", res['link'])
             with col3:
                 if st.button("공사보도", key=f"c_{i}"):
+                    st.toast(f"🏢 공사 섹션 추가 완료", icon="✅")
                     item = f"ㅇ {res['title']}_{res['press']}\n{res['link']}\n\n"
                     if item not in st.session_state.corp_list:
                         st.session_state.corp_list.append(item)
-                        st.toast(f"🏢 공사 섹션 추가 완료", icon="✅")
+
                         st.rerun()
             with col4:
                 if st.button("유관기관 보도", key=f"r_{i}"):
