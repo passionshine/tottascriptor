@@ -233,16 +233,16 @@ if st.session_state.search_results:
             
             # 버튼들은 수직 중앙 정렬이 CSS로 처리됨
             with col2:
-                st.link_button("🔗 원문", res['link'])
+                st.link_button("원문보기", res['link'])
             with col3:
                 # 라벨 단순화 및 이모지 사용
-                if st.button("🏢 공사", key=f"c_{i}"):
+                if st.button("공사보도", key=f"c_{i}"):
                     if item_check not in st.session_state.corp_list:
                         st.session_state.corp_list.append(item_check)
                         st.toast("🏢 공사관련 보도 추가 완료!"); time.sleep(0.1); st.rerun()
                     else: st.toast("⚠️ 이미 추가됨")
             with col4:
-                if st.button("🚆 유관", key=f"r_{i}"):
+                if st.button("유관기관", key=f"r_{i}"):
                     if item_check not in st.session_state.rel_list:
                         st.session_state.rel_list.append(item_check)
                         st.toast("🚆 유관기관 보도 추가 완료!"); time.sleep(0.1); st.rerun()
