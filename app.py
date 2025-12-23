@@ -4,7 +4,6 @@ from bs4 import BeautifulSoup
 import datetime
 import time
 import re
-import json
 import streamlit.components.v1 as components
 
 # --- [1. 스마트 날짜 계산 함수] ---
@@ -24,14 +23,13 @@ def get_target_date():
         target += datetime.timedelta(days=1)
     return target
 
-# --- [2. 뉴스 스크래퍼 (하이브리드: JSON + HTML 백업)] ---
+# --- [2. 뉴스 스크래퍼 (Pure HTML Parsing)] ---
 class NewsScraper:
     def __init__(self):
-        # 일반 브라우저처럼 보이게 헤더 설정
         self.headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
             'Referer': 'https://www.naver.com/',
-            'Accept-Language': 'ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7'
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8'
         }
 
     def fetch_news(self, start_d, end_d, keyword, max_articles):
@@ -43,12 +41,12 @@ class NewsScraper:
         query = f'"{keyword}"'
         max_pages = (max_articles // 10) + 1
         
-        # 로그 출력용 컨테이너
+        # 디버깅 로그창
         log_container = st.container()
         status_text = st.empty()
 
         with log_container:
-            st.info(f"🚀 검색 시작: {keyword} ({start_d} ~ {end_d})")
+            st.info(f"🚀 HTML 직접 파싱 모드 시작: {keyword}")
 
         for page in range(max_pages):
             if len(all_results) >= max_articles: break
@@ -56,143 +54,93 @@ class NewsScraper:
             start_val = (page * 10) + 1
             url = f"https://search.naver.com/search.naver?where=news&query={query}&sm=tab_pge&sort=1&photo=0&pd=3&ds={ds}&de={de}&nso={nso}&start={start_val}"
             
-            status_text.text(f"⏳ {page+1}페이지 수집 중... (현재 {len(all_results)}건)")
+            status_text.text(f"⏳ {page+1}페이지 긁어오는 중... (현재 {len(all_results)}개)")
             
             try:
                 res = requests.get(url, headers=self.headers, timeout=10)
                 if res.status_code != 200:
-                    with log_container: st.error(f"❌ 접속 실패 (Code: {res.status_code})")
+                    with log_container: st.error(f"❌ 접속 실패: {res.status_code}")
+                    break
+
+                soup = BeautifulSoup(res.text, 'html.parser')
+
+                # [핵심] JSON이고 뭐고 다 버리고, HTML 구조(ul.list_news)를 바로 찾습니다.
+                # 네이버 뉴스 검색결과는 보통 <ul class="list_news"> 안에 <li class="bx">로 들어있습니다.
+                news_items = soup.select("ul.list_news > li.bx")
+                
+                # 만약 위 선택자로 안 잡히면 다른 구조(div.news_wrap) 시도
+                if not news_items:
+                    news_items = soup.select("div.news_wrap")
+
+                if not news_items:
+                    with log_container: st.warning(f"⚠️ {page+1}페이지: 뉴스 목록 태그를 못 찾았습니다. (HTML 구조 변경 또는 봇 차단)")
                     continue
 
-                soup = BeautifulSoup(res.content, 'html.parser')
-                
-                # ---------------------------------------------------------
-                # [전략 1] JSON 파싱 시도 (가장 정확한 정보)
-                # ---------------------------------------------------------
-                json_success = False
-                items_list = []
-                
-                scripts = soup.find_all('script')
-                for script in scripts:
-                    if script.string and 'entry.bootstrap' in script.string:
-                        # 정규식 유연화: 앞부분을 .*? 로 처리하여 변수명 변경 등에 대응
-                        pattern = r'entry\.bootstrap\(.*?, ({.*})\);'
-                        match = re.search(pattern, script.string, re.DOTALL)
-                        if match:
-                            try:
-                                json_data = json.loads(match.group(1))
-                                items_list = json_data.get('body', {}).get('props', {}).get('children', [])
-                                if items_list:
-                                    json_success = True
-                                break
-                            except: continue
-
-                # JSON 파싱 성공 시 데이터 처리
-                if json_success:
-                    # with log_container: st.caption(f"✅ {page+1}페이지: JSON 파싱 성공")
-                    for item in items_list:
-                        if len(all_results) >= max_articles: break
-                        if item.get('templateId') != 'newsItem': continue
-                        
-                        props = item.get('props', {})
-                        raw_title = props.get('title', '')
-                        clean_title = re.sub('<[^<]+?>', '', raw_title)
-                        original_link = props.get('titleHref', '')
-                        
-                        if clean_title in seen_titles: continue
-                        seen_titles.add(clean_title)
-
-                        press_name = props.get('sourceProfile', {}).get('title', '알 수 없음')
-                        
-                        # 지면정보 및 네이버뉴스 링크
-                        sub_texts = props.get('subTexts', [])
-                        is_naver = False
-                        final_link = original_link
-                        paper_info = ""
-
-                        for sub in sub_texts:
-                            txt = sub.get('text', '')
-                            if txt == '네이버뉴스' and sub.get('textHref'):
-                                is_naver = True
-                                final_link = sub.get('textHref')
-                            if re.search(r'[A-Za-z]*\d+면', txt):
-                                paper_info = f" ({txt})"
-                        
-                        all_results.append({
-                            'title': f"{clean_title}{paper_info}",
-                            'link': final_link,
-                            'press': press_name,
-                            'is_naver': is_naver
-                        })
-                
-                # ---------------------------------------------------------
-                # [전략 2] HTML 직접 파싱 (JSON 실패 시 비상 작동)
-                # ---------------------------------------------------------
-                else:
-                    with log_container: st.warning(f"⚠️ {page+1}페이지: JSON 추출 실패 → HTML 직접 파싱으로 전환합니다.")
+                page_count = 0
+                for item in news_items:
+                    if len(all_results) >= max_articles: break
                     
-                    # 네이버 뉴스 리스트 컨테이너 찾기
-                    news_items = soup.select('div.news_wrap')
-                    if not news_items:
-                        news_items = soup.select('li.bx') # 모바일/다른 뷰일 경우 대비
+                    # 1. 제목 및 원본 링크 (a.news_tit)
+                    title_tag = item.select_one("a.news_tit")
+                    if not title_tag: continue
                     
-                    for news in news_items:
-                        if len(all_results) >= max_articles: break
-                        
-                        title_tag = news.select_one('a.news_tit')
-                        if not title_tag: continue
-                        
-                        title = title_tag.get_text(strip=True)
-                        link = title_tag['href']
-                        
-                        if title in seen_titles: continue
-                        seen_titles.add(title)
-                        
-                        # 언론사
-                        press_tag = news.select_one('a.info.press')
-                        press = press_tag.get_text(strip=True) if press_tag else "알 수 없음"
-                        
-                        # 네이버뉴스 링크 확인
-                        is_naver = False
-                        info_links = news.select('a.info')
-                        for info in info_links:
-                            if "네이버뉴스" in info.get_text():
-                                is_naver = True
-                                link = info['href']
-                                break
-                        
-                        # 지면 정보 확인 (span.info 텍스트 등)
-                        paper_info = ""
-                        spans = news.select('span.info')
-                        for span in spans:
-                            txt = span.get_text(strip=True)
-                            if re.search(r'\d+면', txt):
-                                paper_info = f" ({txt})"
+                    raw_title = title_tag.get_text(strip=True)
+                    original_link = title_tag['href']
+                    
+                    if raw_title in seen_titles: continue
+                    seen_titles.add(raw_title)
 
-                        all_results.append({
-                            'title': f"{title}{paper_info}",
-                            'link': link,
-                            'press': press,
-                            'is_naver': is_naver
-                        })
+                    # 2. 언론사 이름 (a.info.press)
+                    press_tag = item.select_one("a.info.press")
+                    press_name = press_tag.get_text(strip=True) if press_tag else "알 수 없음"
 
-                time.sleep(0.5) # 차단 방지 딜레이
+                    # 3. [중요] 네이버 뉴스 링크 & 지면 정보 찾기
+                    # info_group 안의 a 태그와 span 태그를 뒤집니다.
+                    is_naver = False
+                    final_link = original_link # 기본값은 언론사 링크
+                    paper_info = ""
+
+                    # (A) 네이버 뉴스 링크: "네이버뉴스" 텍스트를 가진 a 태그 찾기
+                    info_links = item.select("a.info")
+                    for a_tag in info_links:
+                        if "네이버뉴스" in a_tag.get_text():
+                            is_naver = True
+                            final_link = a_tag['href']
+                            break # 찾았으면 중단
+                    
+                    # (B) 지면 정보: "A1면", "1면" 같은 텍스트를 가진 span 태그 찾기
+                    info_spans = item.select("span.info")
+                    for span in info_spans:
+                        txt = span.get_text(strip=True)
+                        if re.search(r'[A-Za-z]*\d+면', txt):
+                            paper_info = f" ({txt})"
+                    
+                    # 제목 합치기
+                    full_title = f"{raw_title}{paper_info}"
+
+                    all_results.append({
+                        'title': full_title,
+                        'link': final_link,
+                        'press': press_name,
+                        'is_naver': is_naver
+                    })
+                    page_count += 1
                 
+                # with log_container: st.write(f"✅ {page+1}페이지: {page_count}건 수집")
+                time.sleep(0.5)
+
             except Exception as e:
-                with log_container: st.error(f"Error on page {page+1}: {e}")
+                with log_container: st.error(f"❌ 에러 발생: {e}")
                 continue
-
+        
         status_text.empty()
-        # 결과 요약 로그
         if not all_results:
-            with log_container: st.error("❌ 검색 결과가 0건입니다. (네이버가 봇을 완전히 차단했거나 검색어가 없습니다.)")
-        else:
-            with log_container: st.success(f"✅ 총 {len(all_results)}건 수집 완료")
-            
+            with log_container: st.error("결과가 없습니다. 날짜를 변경하거나 검색어를 확인해주세요.")
+        
         return all_results
 
 # --- [3. UI 설정] ---
-st.set_page_config(page_title="Totta Scriptor", layout="wide")
+st.set_page_config(page_title="Totta Scraper (HTML Ver)", layout="wide")
 
 st.markdown("""
     <style>
@@ -202,11 +150,11 @@ st.markdown("""
     .stLinkButton > a { width: 100% !important; height: 38px !important; display: flex; align-items: center; justify-content: center; font-size: 11px !important; }
     
     .news-card { padding: 8px 12px; border-radius: 6px; border-left: 4px solid #007bff; box-shadow: 0 1px 1px rgba(0,0,0,0.05); display: flex; flex-direction: column; justify-content: center; height: 100%; }
-    .bg-white { background: white !important; }
     .bg-scraped { background: #eee !important; border-left: 4px solid #888 !important; opacity: 0.7; }
-    .news-title { font-size: 17px !important; font-weight: 600; color: #333; line-height: 1.2; margin-bottom: 2px; }
-    .news-meta { font-size: 14px !important; color: #666; }
-    .section-header { font-size: 18px; font-weight: 700; color: #333; margin-top: 25px; margin-bottom: 15px; border-bottom: 2px solid #007bff; padding-bottom: 5px; display: inline-block; }
+    .bg-white { background: white !important; }
+    .news-title { font-size: 16px !important; font-weight: 600; color: #333; line-height: 1.2; margin-bottom: 2px; }
+    .news-meta { font-size: 13px !important; color: #666; }
+    .section-header { font-size: 18px; font-weight: 700; color: #333; margin-top: 20px; margin-bottom: 10px; border-bottom: 2px solid #007bff; display: inline-block; }
     
     div[data-testid="stHorizontalBlock"] > div:nth-child(3) button { background-color: #e3f2fd !important; color: #1565c0 !important; border: 1px solid #90caf9 !important; }
     div[data-testid="stHorizontalBlock"] > div:nth-child(4) button { background-color: #e8f5e9 !important; color: #2e7d32 !important; border: 1px solid #a5d6a7 !important; }
@@ -217,7 +165,7 @@ st.markdown("""
 for key in ['corp_list', 'rel_list', 'search_results']:
     if key not in st.session_state: st.session_state[key] = []
 
-st.title("🚇 또타 스크립터 (Final)")
+st.title("🚇 또타 스크립터 (HTML 파싱 버전)")
 
 # 1. 결과 영역
 t_date = get_target_date()
@@ -261,7 +209,6 @@ with st.expander("🔍 뉴스 검색 설정", expanded=True):
     with d2: end_d = st.date_input("종료일", datetime.date.today())
     max_a = st.slider("최대 기사 수", 10, 100, 30)
     
-    # [핵심] st.rerun()을 제거했습니다. 이제 로그와 결과가 유지됩니다.
     if st.button("🚀 뉴스 검색 시작", type="primary", use_container_width=True):
         st.session_state.search_results = NewsScraper().fetch_news(start_d, end_d, keyword, max_a)
 
@@ -297,7 +244,6 @@ def display_list(title, items, key_prefix):
                         st.toast("🚆 추가됨"); time.sleep(0.1); st.rerun()
         st.markdown("<hr style='margin: 3px 0; border: none; border-top: 1px solid #f0f0f0;'>", unsafe_allow_html=True)
 
-# 검색 결과 표시
 if st.session_state.search_results:
     naver_news = [x for x in st.session_state.search_results if x['is_naver']]
     other_news = [x for x in st.session_state.search_results if not x['is_naver']]
