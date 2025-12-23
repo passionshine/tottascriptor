@@ -143,7 +143,7 @@ class NewsScraper:
         return all_results
 
 # --- [3. UI 설정 및 CSS] ---
-st.set_page_config(page_title="Totta Scraper", layout="wide")
+st.set_page_config(page_title="Totta Scriptor for web", layout="wide")
 
 st.markdown("""
     <style>
@@ -242,4 +242,5 @@ if st.session_state.search_results:
     if p_news: display_list("📰 지면 보도", p_news, "p")
     if n_news: display_list("🟢 네이버 뉴스", n_news, "n")
     if o_news: display_list("🌐 기타 뉴스", o_news, "o")
+
 
