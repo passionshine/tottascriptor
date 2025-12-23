@@ -23,7 +23,7 @@ def get_target_date():
         target += datetime.timedelta(days=1)
     return target
 
-# --- [2. 뉴스 스크래퍼 (날짜 파싱 강력 강화 Ver)] ---
+# --- [2. 뉴스 스크래퍼 (qdt=1 적용 버전)] ---
 class NewsScraper:
     def __init__(self):
         self.scraper = cloudscraper.create_scraper()
@@ -52,13 +52,14 @@ class NewsScraper:
         for page in range(1, max_pages + 1):
             if len(all_results) >= max_articles: break
             
-            # 진행률 바
             current_progress = min(page / max_pages, 1.0)
             progress_bar.progress(current_progress)
             status_text.text(f"⏳ {page}/{max_pages}페이지 분석 중... (현재 {len(all_results)}건)")
             
             start_index = (page - 1) * 10 + 1
-            url = f"https://search.naver.com/search.naver?where=news&query={query}&sm=tab_pge&sort=1&photo=0&pd=3&ds={ds}&de={de}&nso={nso}&start={start_index}"
+            
+            # [수정] URL에 &qdt=1 파라미터 추가
+            url = f"https://search.naver.com/search.naver?where=news&query={query}&sm=tab_pge&sort=1&photo=0&pd=3&ds={ds}&de={de}&nso={nso}&qdt=1&start={start_index}"
             
             try:
                 response = self.scraper.get(url, headers=self.headers, timeout=10)
@@ -111,25 +112,20 @@ class NewsScraper:
                         if press_el:
                             press_name = press_el.get_text(strip=True)
                         
-                        # 3. [강력해진 날짜 파싱]
-                        # 카드 내의 모든 텍스트를 긁어서 날짜 패턴을 찾습니다.
-                        # (태그 구조가 복잡해도 텍스트는 무조건 있기 때문)
-                        full_text = card.get_text(separator=" ", strip=True)
-                        
-                        # (A) "OO 전" 패턴 찾기 (1시간 전, 2분 전, 방금 전 등)
-                        date_match = re.search(r'(\d+[분시일주]\s?전|방금\s?전)', full_text)
-                        if date_match:
-                            article_date = date_match.group(1)
-                        else:
-                            # (B) YYYY.MM.DD 패턴 찾기
-                            date_match_2 = re.search(r'(\d{4}\.\d{2}\.\d{2}\.?)', full_text)
-                            if date_match_2:
-                                article_date = date_match_2.group(1)
+                        # 3. 날짜 및 지면 정보 파싱 (텍스트 스캔)
+                        info_areas = card.select(".info_group, .news_info, .sds-comps-profile-info-subtexts, .info")
+                        if not info_areas: info_areas = [card]
 
-                        # 4. 지면 정보 파싱 (A1면 등)
-                        paper_match = re.search(r'([A-Za-z]*\d+면)', full_text)
-                        if paper_match:
-                            paper_info = f" ({paper_match.group(1)})"
+                        for area in info_areas:
+                            area_text = area.get_text(separator=" ", strip=True)
+                            
+                            if not article_date:
+                                date_match = re.search(r'(\d+[분시일주]\s?전|방금\s?전|\d{4}\.\d{2}\.\d{2}\.?)', area_text)
+                                if date_match: article_date = date_match.group(1)
+                            
+                            if not paper_info:
+                                paper_match = re.search(r'([A-Za-z]*\d+면)', area_text)
+                                if paper_match: paper_info = f" ({paper_match.group(1)})"
 
                     full_title = f"{title}{paper_info}"
 
@@ -141,7 +137,7 @@ class NewsScraper:
                         'link': final_link,
                         'press': press_name,
                         'is_naver': is_naver,
-                        'date': article_date # 찾아낸 날짜 저장
+                        'date': article_date
                     })
                     
                 time.sleep(0.3)
@@ -239,11 +235,8 @@ def display_list(title, items, key_prefix):
         return
 
     for i, res in enumerate(items):
-        # [수정] 날짜 정보가 있으면 가져오고, 없으면 빈칸
-        date_val = res.get('date', '') 
+        date_val = res.get('date', '')
         date_str = f"[{date_val}] " if date_val else ""
-        
-        # 스크랩 목록에 넣을 텍스트
         item_txt = f"ㅇ {date_str}{res['title']}_{res['press']}\n{res['link']}\n\n"
         
         is_scraped = (item_txt in st.session_state.corp_list) or (item_txt in st.session_state.rel_list)
