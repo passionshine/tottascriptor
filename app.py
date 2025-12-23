@@ -68,13 +68,13 @@ class NewsScraper:
         return all_results
 
 # --- [3. UI 설정 및 밀착 레이아웃 CSS 수정됨] ---
-st.set_page_config(page_title="또타 스크립터", layout="wide")
+st.set_page_config(page_title="Totta Scriptor", layout="wide")
 
 st.markdown("""
     <style>
     /* 1. 수평 블록 간격 제거 */
     [data-testid="stHorizontalBlock"] {
-        gap: 0.2rem !important;
+        gap: 0.4px !important;
         align-items: center !important; /* 수직 중앙 정렬 */
     }
 
@@ -86,7 +86,7 @@ st.markdown("""
         justify-content: center !important; 
     }
 
-    /* 3. 모든 버튼 기본 스타일 (꽉 채우기) */
+    /* 3. 모든 버튼 기본 스타일 */
     .stButton { width: 100% !important; margin: 0 !important; }
     .stButton > button {
         width: 100% !important;
