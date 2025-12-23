@@ -116,7 +116,7 @@ class NewsScraper:
                         full_text = card.get_text(separator=" ", strip=True)
                         
                         # 날짜 파싱
-                        date_match = re.search(r'(\d+[분시일주초]\s?전|방금\s?전)', full_text)
+                        date_match = re.search(r'(\d+\s?(?:분|시간|일|주|초)\s?전|방금\s?전)', full_text)
                         if date_match: article_date = date_match.group(1)
                         else:
                             date_match_2 = re.search(r'(\d{4}\.\d{2}\.\d{2}\.?)', full_text)
@@ -351,3 +351,4 @@ if st.session_state.search_results:
     display_list("🟢 네이버 뉴스", naver_news, "n")
     st.write("")
     display_list("🌐 언론사 자체 기사", other_news, "o")
+
