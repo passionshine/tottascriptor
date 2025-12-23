@@ -76,59 +76,53 @@ class NewsScraper:
             except: break
         return all_results
 
-# --- [3. UI 설정 및 모바일 한 줄 강제 CSS] ---
+# --- [3. UI 설정 및 모바일 최적화 CSS] ---
 st.set_page_config(page_title="또타 스크립터", layout="wide")
 
 st.markdown("""
     <style>
-    /* [모바일 핵심] 컬럼이 세로로 쌓이지 않도록 강제 가로 배치 */
+    /* 컬럼 간격 완전 밀착 */
+    [data-testid="stHorizontalBlock"] {
+        gap: 0px !important;
+    }
+    
     [data-testid="column"] {
         flex-direction: row !important;
         flex-wrap: nowrap !important;
         align-items: center !important;
-        min-width: 0px !important;
-    }
-    
-    /* 각 컬럼 내부 요소 간격 조정 */
-    [data-testid="stHorizontalBlock"] {
-        gap: 4px !important;
+        padding-right: 2px !important; /* 버튼 사이 아주 미세한 간격 */
     }
 
-    /* 공통 버튼 스타일 (폭 좁게 최적화) */
+    /* 버튼 스타일 최적화 */
     .stButton > button, .stLinkButton > a {
-        width: 100% !important; height: 38px !important;
-        font-size: 10px !important; font-weight: 800 !important;
-        padding: 0px 1px !important;
-        border-radius: 6px !important;
-        display: inline-flex !important; align-items: center !important;
-        justify-content: center !important; 
-        white-space: normal !important; /* 글자 줄바꿈 허용 */
-        line-height: 1.1 !important;
+        width: 100% !important; 
+        height: 38px !important;
+        font-size: 10px !important; 
+        font-weight: 800 !important;
+        padding: 0px !important;
+        border-radius: 4px !important;
+        white-space: nowrap !important;
     }
 
-    /* 공사보도 버튼: 파스텔 블루 */
+    /* 버튼 색상 적용 */
     div[data-testid="column"]:nth-of-type(3) button {
         background-color: #D1E9FF !important; color: #004085 !important;
-        border: 1px solid #B8DAFF !important;
     }
-
-    /* 유관보도 버튼: 파스텔 연두 */
     div[data-testid="column"]:nth-of-type(4) button {
         background-color: #E2F0D9 !important; color: #385723 !important;
-        border: 1px solid #C5E0B4 !important;
     }
 
-    /* 뉴스 카드 디자인 */
+    /* 뉴스 카드 너비 확보 */
     .news-card {
         background: white; padding: 10px; border-radius: 8px;
         border-left: 5px solid #007bff; box-shadow: 0 1px 2px rgba(0,0,0,0.1);
-        min-height: 50px;
+        width: 100%;
     }
     .news-title { 
-        font-size: 17px !important; font-weight: 700; color: #111; 
-        line-height: 1.3; word-break: keep-all; 
+        font-size: 13px !important; font-weight: 700; color: #111; 
+        line-height: 1.3; overflow: hidden; text-overflow: ellipsis;
     }
-    .news-meta { font-size: 14px !important; color: #666; margin-top: 3px; }
+    .news-meta { font-size: 9px !important; color: #666; margin-top: 2px; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -149,9 +143,17 @@ final_output += "\n[철도 등 기타 유관기관 관련 보도]\n"
 final_output += "".join(st.session_state.rel_list) if st.session_state.rel_list else "(내용 없음)\n"
 
 st.text_area("스크랩 내용", value=final_output, height=150, label_visibility="collapsed")
-if st.button("📋 전체 복사하기", use_container_width=True):
-    st.toast("✅ 클립보드에 복사되었습니다!")
-    components.html(f"<script>navigator.clipboard.writeText(`{final_output}`);</script>", height=0)
+
+col_btn1, col_btn2 = st.columns(2)
+with col_btn1:
+    if st.button("📋 복사하기", use_container_width=True):
+        st.toast("클립보드 복사 완료!")
+        components.html(f"<script>navigator.clipboard.writeText(`{final_output}`);</script>", height=0)
+with col_btn2:
+    if st.button("🗑️ 초기화", use_container_width=True):
+        st.session_state.corp_list = []
+        st.session_state.rel_list = []
+        st.rerun()
 
 st.divider()
 
@@ -162,44 +164,37 @@ with st.expander("🔍 검색 설정", expanded=True):
     with c1: start_d = st.date_input("시작", datetime.date.today()-datetime.timedelta(days=1))
     with c2: end_d = st.date_input("종료", datetime.date.today())
     max_a = st.slider("최대 기사 수", 10, 100, 30, 10)
-    
-    all_res = st.session_state.search_results
-    filter_choice = st.radio("보기 필터", [f"모두 보기 ({len(all_res)})", f"네이버 기사 ({len([r for r in all_res if r['is_naver']])})", f"언론사 자체기사 ({len([r for r in all_res if not r['is_naver']])})"], horizontal=True)
 
 if st.button("🚀 뉴스 검색 시작", type="primary", use_container_width=True):
     st.session_state.search_results = NewsScraper().fetch_news(start_d, end_d, keyword, max_a)
     st.rerun()
 
-# 3. 뉴스 리스트 (모바일 한 줄 강제 적용)
+# 3. 뉴스 리스트 (토스트 해결 및 레이아웃 수정)
 if st.session_state.search_results:
-    if "네이버 기사" in filter_choice:
-        display_results = [r for r in st.session_state.search_results if r['is_naver']]
-    elif "언론사 자체기사" in filter_choice:
-        display_results = [r for r in st.session_state.search_results if not r['is_naver']]
-    else:
-        display_results = st.session_state.search_results
-
-    for i, res in enumerate(display_results):
+    for i, res in enumerate(st.session_state.search_results):
         with st.container():
-            # 모바일에서도 7:1:1:1 비율 유지 시도
-            col1, col2, col3, col4 = st.columns([0.76, 0.8, 0.8, 0.8])
+            # 비율 조정: 뉴스카드 70%, 나머지 버튼 10%씩 분할
+            col1, col2, col3, col4 = st.columns([0.7, 0.1, 0.1, 0.1])
             with col1:
                 st.markdown(f'<div class="news-card"><div class="news-title">{res["title"]}</div><div class="news-meta">[{res["press"]}] {res["time"]}</div></div>', unsafe_allow_html=True)
             with col2:
                 st.link_button("원문", res['link'])
             with col3:
-                if st.button("공사보도", key=f"c_{i}"):
-                    st.toast(f"🏢 공사 섹션 추가 완료", icon="✅")
+                # 토스트 확인을 위해 rerun 위치 조정
+                if st.button("공사+", key=f"c_{i}"):
                     item = f"ㅇ {res['title']}_{res['press']}\n{res['link']}\n\n"
+                    st.toast("🏢 공사 섹션 추가!")
                     if item not in st.session_state.corp_list:
                         st.session_state.corp_list.append(item)
-
+                        time.sleep(0.5) # 토스트가 보일 시간을 아주 잠깐 줌
                         st.rerun()
             with col4:
-                if st.button("유관기관 보도", key=f"r_{i}"):
-                    item = f"ㅇ {res['title']}_{res['press']}\n{res['link']}\n\n"
+                if st.button("유관+", key=f"r_{i}"):
+                    item = f"ㅇ {res['title']}_{res['press']}\n{res['link']}\n\n"1            
+                    st.toast("🚆 유관 섹션 추가!")
                     if item not in st.session_state.rel_list:
                         st.session_state.rel_list.append(item)
-                        st.toast(f"🚆 유관기관 추가 완료", icon="✅")
+
+                        time.sleep(0.5)
                         st.rerun()
-        st.write("") # 기사 간 미세 여백
+        st.write("")
