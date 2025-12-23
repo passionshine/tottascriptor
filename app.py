@@ -26,7 +26,7 @@ def get_target_date():
         target += datetime.timedelta(days=1)
     return target
 
-# --- [2. 뉴스 스크립터 (요약 기능 추가)] ---
+# --- [2. 뉴스 스크립터 (요약 기능 및 시간 파싱 강화)] ---
 class NewsScraper:
     def __init__(self):
         self.scraper = cloudscraper.create_scraper()
@@ -91,7 +91,12 @@ class NewsScraper:
                         full_text = card.get_text(separator=" ", strip=True)
                         date_match = re.search(r'(\d+\s?(?:분|시간|일|주|초)\s?전|방금\s?전)', full_text)
                         abs_date_match = re.search(r'(\d{4}[\.\-]\d{2}[\.\-]\d{2})', full_text)
-                        article_date = date_match.group(1) if date_match else (abs_date_match.group(1).rstrip('.') if abs_date_match else "")
+                        
+                        article_date = ""
+                        if date_match:
+                            article_date = date_match.group(1)
+                        elif abs_date_match:
+                            article_date = abs_date_match.group(1).rstrip('.')
                         
                         is_paper = True if re.search(r'([A-Za-z]*\d+면)', full_text) else False
                         paper_info = " (지면)" if is_paper else ""
@@ -130,8 +135,9 @@ st.markdown("""
     .news-summary { font-size: 12.5px !important; color: #555; margin-bottom: 8px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
     .news-meta { font-size: 12px !important; color: #666; }
     
-    /* 버튼 그룹 간격 축소 */
+    /* 버튼 그룹 간격 축소 및 스타일 */
     div[data-testid="column"] { padding: 0 !important; }
+    div[data-testid="stHorizontalBlock"] { gap: 0.2rem !important; }
     .stButton > button { 
         width: 100% !important; height: 35px !important; font-size: 11px !important; 
         padding: 0 !important; letter-spacing: -0.5px;
@@ -197,8 +203,8 @@ def display_list(title, items, key_p):
             </div>""", unsafe_allow_html=True)
         
         with col_b:
-            # 버튼 3개를 1/3씩 배분하고 밀착 배치
-            b1, b2, b3 = st.columns(3, gap="extra-small")
+            # 버튼 3개를 1/3씩 배분 (gap 수정 완료)
+            b1, b2, b3 = st.columns(3, gap="small")
             with b1: st.link_button("원문", res['link'])
             with b2:
                 if st.button("공사", key=f"c_{key_p}_{i}"):
