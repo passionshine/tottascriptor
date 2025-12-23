@@ -23,7 +23,7 @@ def get_target_date():
         target += datetime.timedelta(days=1)
     return target
 
-# --- [2. 뉴스 스크래퍼 (qdt=1 적용 버전)] ---
+# --- [2. 뉴스 스크래퍼 (강력한 파싱 로직)] ---
 class NewsScraper:
     def __init__(self):
         self.scraper = cloudscraper.create_scraper()
@@ -42,7 +42,6 @@ class NewsScraper:
         query = f'"{keyword}"'
         max_pages = (max_articles // 10) + 1
         
-        # UI 관련
         status_text = st.empty()
         progress_bar = st.progress(0)
         log_container = st.container()
@@ -57,8 +56,7 @@ class NewsScraper:
             status_text.text(f"⏳ {page}/{max_pages}페이지 분석 중... (현재 {len(all_results)}건)")
             
             start_index = (page - 1) * 10 + 1
-            
-            # [수정] URL에 &qdt=1 파라미터 추가
+            # qdt=1 파라미터 적용
             url = f"https://search.naver.com/search.naver?where=news&query={query}&sm=tab_pge&sort=1&photo=0&pd=3&ds={ds}&de={de}&nso={nso}&qdt=1&start={start_index}"
             
             try:
@@ -112,20 +110,21 @@ class NewsScraper:
                         if press_el:
                             press_name = press_el.get_text(strip=True)
                         
-                        # 3. 날짜 및 지면 정보 파싱 (텍스트 스캔)
-                        info_areas = card.select(".info_group, .news_info, .sds-comps-profile-info-subtexts, .info")
-                        if not info_areas: info_areas = [card]
+                        # 3. 날짜 및 지면 정보 파싱 (텍스트 전체 스캔)
+                        full_text = card.get_text(separator=" ", strip=True)
+                        
+                        # 날짜 패턴
+                        date_match = re.search(r'(\d+[분시일주]\s?전|방금\s?전)', full_text)
+                        if date_match:
+                            article_date = date_match.group(1)
+                        else:
+                            date_match_2 = re.search(r'(\d{4}\.\d{2}\.\d{2}\.?)', full_text)
+                            if date_match_2: article_date = date_match_2.group(1)
 
-                        for area in info_areas:
-                            area_text = area.get_text(separator=" ", strip=True)
-                            
-                            if not article_date:
-                                date_match = re.search(r'(\d+[분시일주]\s?전|방금\s?전|\d{4}\.\d{2}\.\d{2}\.?)', area_text)
-                                if date_match: article_date = date_match.group(1)
-                            
-                            if not paper_info:
-                                paper_match = re.search(r'([A-Za-z]*\d+면)', area_text)
-                                if paper_match: paper_info = f" ({paper_match.group(1)})"
+                        # 지면 정보 패턴
+                        paper_match = re.search(r'([A-Za-z]*\d+면)', full_text)
+                        if paper_match:
+                            paper_info = f" ({paper_match.group(1)})"
 
                     full_title = f"{title}{paper_info}"
 
@@ -182,22 +181,76 @@ for key in ['corp_list', 'rel_list', 'search_results']:
 
 st.title("🚇 또타 스크립터 (Final Ver)")
 
-# 1. 결과 영역
+# 1. 스크랩 목록 (복사 기능 수정됨)
 t_date = get_target_date()
 date_header = f"<{t_date.month}월 {t_date.day}일 조간 스크랩>"
-final_output = f"{date_header}\n\n[공사 관련 보도]\n" + "".join(st.session_state.corp_list) + "\n[유관기관 관련 보도]\n" + "".join(st.session_state.rel_list)
 
-st.text_area("📋 스크랩 결과", value=final_output, height=max(180, (final_output.count('\n') + 1) * 25))
+if st.session_state.corp_list or st.session_state.rel_list:
+    final_output = f"{date_header}\n\n[공사 관련 보도]\n" + "".join(st.session_state.corp_list) + "\n[유관기관 관련 보도]\n" + "".join(st.session_state.rel_list)
+else:
+    final_output = ""
 
-c1, c2 = st.columns(2)
-with c1:
-    if st.button("📋 텍스트 복사", use_container_width=True):
-        st.toast("복사 완료!")
-        components.html(f"<script>navigator.clipboard.writeText(`{final_output}`);</script>", height=0)
-with c2:
-    if st.button("🗑️ 초기화", use_container_width=True):
-        st.session_state.corp_list, st.session_state.rel_list = [], []
-        st.rerun()
+# 텍스트 영역 (높이 자동 조절)
+text_height = max(180, (final_output.count('\n') + 1) * 25)
+st.text_area("📋 스크랩 결과", value=final_output, height=text_height)
+
+# --- [복사 버튼 영역] ---
+# Streamlit 버튼 대신 HTML/JS를 사용하여 클립보드 복사를 강제합니다.
+# 이 방식은 HTTPS가 아닌 환경이나 모바일에서도 작동하도록 execCommand 폴백을 사용합니다.
+if final_output:
+    js_code = f"""
+    <html>
+        <head>
+            <style>
+                .copy-btn {{
+                    display: inline-flex;
+                    align-items: center;
+                    justify-content: center;
+                    width: 100%;
+                    height: 38px;
+                    background-color: #f0f2f6;
+                    color: #31333F;
+                    border: 1px solid #d1d5db;
+                    border-radius: 6px;
+                    cursor: pointer;
+                    font-family: sans-serif;
+                    font-weight: 600;
+                    font-size: 14px;
+                }}
+                .copy-btn:hover {{ border-color: #007bff; color: #007bff; background-color: #e7f3ff; }}
+                .copy-btn:active {{ background-color: #cbe4ff; }}
+            </style>
+        </head>
+        <body>
+            <textarea id="hidden-text" style="position:absolute; top:-9999px; left:-9999px;">{final_output}</textarea>
+            <button class="copy-btn" onclick="copyToClipboard()">📋 텍스트 복사하기 (클릭)</button>
+            <script>
+                function copyToClipboard() {{
+                    var textArea = document.getElementById("hidden-text");
+                    textArea.select();
+                    textArea.setSelectionRange(0, 99999); /* For mobile devices */
+                    
+                    try {{
+                        var successful = document.execCommand('copy');
+                        if (successful) {{
+                            alert('✅ 복사되었습니다!');
+                        }} else {{
+                            alert('❌ 복사에 실패했습니다. 수동으로 복사해주세요.');
+                        }}
+                    }} catch (err) {{
+                        alert('❌ 브라우저가 복사를 차단했습니다.');
+                    }}
+                }}
+            </script>
+        </body>
+    </html>
+    """
+    components.html(js_code, height=50)
+
+# 초기화 버튼 (파이썬 버튼 사용)
+if st.button("🗑️ 전체 초기화", use_container_width=True):
+    st.session_state.corp_list, st.session_state.rel_list = [], []
+    st.rerun()
 
 # 개별 관리
 with st.expander("🛠️ 스크랩 항목 관리", expanded=False):
@@ -258,18 +311,18 @@ def display_list(title, items, key_prefix):
                 if st.button("공사", key=f"c_{key_prefix}_{i}"):
                     if item_txt not in st.session_state.corp_list:
                         st.session_state.corp_list.append(item_txt)
-                        st.toast("🏢 추가되었습니다!"); time.sleep(1.5); st.rerun()
+                        st.toast("🏢 추가되었습니다!"); time.sleep(1.0); st.rerun()
             with c4:
                 if st.button("유관", key=f"r_{key_prefix}_{i}"):
                     if item_txt not in st.session_state.rel_list:
                         st.session_state.rel_list.append(item_txt)
-                        st.toast("🚆 추가되었습니다!"); time.sleep(1.5); st.rerun()
+                        st.toast("🚆 추가되었습니다!"); time.sleep(1.0); st.rerun()
         
         st.markdown("<hr style='margin: 3px 0; border: none; border-top: 1px solid #f0f0f0;'>", unsafe_allow_html=True)
 
 if st.session_state.search_results:
-    naver_news = [x for x in st.session_state.search_results if x['is_naver']]
-    other_news = [x for x in st.session_state.search_results if not x['is_naver']]
+    naver_news = [x for x in st.session_state.search_results if x.get('is_naver')]
+    other_news = [x for x in st.session_state.search_results if not x.get('is_naver')]
     
     display_list("🟢 네이버 뉴스", naver_news, "n")
     st.write("")
