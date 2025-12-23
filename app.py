@@ -22,7 +22,7 @@ def get_target_date():
         target += datetime.timedelta(days=1)
     return target
 
-# --- [2. 뉴스 스크래퍼 (로직 수정됨)] ---
+# --- [2. 뉴스 스크래퍼] ---
 class NewsScraper:
     def __init__(self):
         self.scraper = cloudscraper.create_scraper()
@@ -45,7 +45,7 @@ class NewsScraper:
             try:
                 res = self.scraper.get(url, headers=self.headers, timeout=10)
                 soup = BeautifulSoup(res.content, 'html.parser')
-                items = soup.select('a[data-heatmap-target=".tit"]') # 제목 링크 선택
+                items = soup.select('a[data-heatmap-target=".tit"]')
                 
                 for t_tag in items:
                     if len(all_results) >= max_articles: break
@@ -54,11 +54,9 @@ class NewsScraper:
                     if link in seen_links: continue
                     seen_links.add(link)
                     
-                    # 정보 추출을 위한 변수 초기화
                     press_name = "알 수 없음"
-                    is_naver = False # 네이버 뉴스 뱃지 유무 확인용
+                    is_naver = False 
                     
-                    # 상위 요소(카드)로 올라가면서 언론사명과 '네이버뉴스' 텍스트 찾기
                     card = t_tag
                     found_press = False
                     
@@ -66,17 +64,15 @@ class NewsScraper:
                         if card.parent:
                             card = card.parent
                             
-                            # 1. 언론사 이름 찾기
+                            # 언론사 이름 찾기
                             if not found_press:
                                 p_el = card.select_one(".sds-comps-profile-info-title-text, .press_name, .info.press")
                                 if p_el: 
                                     press_name = p_el.get_text(strip=True)
                                     found_press = True
                             
-                            # 2. [수정됨] '네이버뉴스' 텍스트/태그 찾기 (사용자 요청 반영)
-                            # 해당 카드 안에 "네이버뉴스"라는 텍스트가 포함된 요소가 있는지 검사
+                            # 네이버 뉴스 뱃지 확인
                             if not is_naver:
-                                # HTML 구조상 텍스트가 존재하면 네이버 뉴스 연동 기사임
                                 if card.find(string="네이버뉴스"): 
                                     is_naver = True
 
@@ -84,7 +80,7 @@ class NewsScraper:
                         'title': title, 
                         'link': link, 
                         'press': press_name,
-                        'is_naver': is_naver # 판별 결과 저장
+                        'is_naver': is_naver
                     })
                 time.sleep(0.1)
             except: break
@@ -95,7 +91,7 @@ st.set_page_config(page_title="Totta Scriptor", layout="wide")
 
 st.markdown("""
     <style>
-    /* 1. 수평 블록 간격 제어 (4px) */
+    /* 1. 수평 블록 간격 제어 */
     [data-testid="stHorizontalBlock"] {
         gap: 4px !important;
         align-items: center !important; 
@@ -109,7 +105,7 @@ st.markdown("""
         justify-content: center !important; 
     }
 
-    /* 3. 버튼 기본 스타일 (좌우 패딩 5px) */
+    /* 3. 버튼 기본 스타일 */
     .stButton { width: 100% !important; margin: 0 !important; }
     .stButton > button {
         width: 100% !important;
@@ -129,7 +125,7 @@ st.markdown("""
         font-size: 11px !important;
     }
 
-    /* 4. 버튼 색상 강제 지정 (3번째: 공사, 4번째: 유관) */
+    /* 4. 버튼 색상 강제 지정 */
     div[data-testid="stHorizontalBlock"] > div[data-testid="column"]:nth-child(3) button,
     div[data-testid="stHorizontalBlock"] > div[data-testid="stColumn"]:nth-child(3) button {
         background-color: #e3f2fd !important;
@@ -283,11 +279,11 @@ def display_news_section(title, articles, section_key):
         
         st.markdown("<hr style='margin: 3px 0; border: none; border-top: 1px solid #f0f0f0;'>", unsafe_allow_html=True)
 
-# 4. 결과 출력 로직 (Scraper에서 판별한 is_naver 플래그 사용)
+# 4. 결과 출력 로직 (안전한 접근 적용)
 if st.session_state.search_results:
-    # NewsScraper에서 넘어온 'is_naver' (True/False) 값을 기준으로 분류
-    naver_news = [item for item in st.session_state.search_results if item['is_naver']]
-    other_news = [item for item in st.session_state.search_results if not item['is_naver']]
+    # item.get('is_naver', False)를 사용하여 키가 없을 경우 에러 대신 False를 반환하게 함
+    naver_news = [item for item in st.session_state.search_results if item.get('is_naver', False)]
+    other_news = [item for item in st.session_state.search_results if not item.get('is_naver', False)]
     
     # 섹션별 출력
     display_news_section("🟢 네이버 뉴스", naver_news, "naver")
