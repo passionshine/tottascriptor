@@ -232,7 +232,7 @@ def display_list(title, items, key_p):
         is_scraped = (item_txt in st.session_state.corp_list) or (item_txt in st.session_state.rel_list)
         bg = "bg-scraped" if is_scraped else ""
 
-        col_m, col_b = st.columns([0.65, 0.35])
+        col_m, col_b = st.columns([0.7, 0.3])
         
         with col_m:
             st.markdown(f"""<div class="news-card {bg}">
@@ -274,6 +274,7 @@ if st.session_state.search_results:
     if p_news: display_list("📰 지면 보도", p_news, "p")
     if n_news: display_list("🟢 네이버 뉴스", n_news, "n")
     if o_news: display_list("🌐 언론사 자체 뉴스", o_news, "o")
+
 
 
 
