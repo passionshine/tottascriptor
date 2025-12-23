@@ -37,11 +37,13 @@ class NewsScraper:
         ds, de = start_d.strftime("%Y.%m.%d"), end_d.strftime("%Y.%m.%d")
         nso = f"so:dd,p:from{start_d.strftime('%Y%m%d')}to{end_d.strftime('%Y%m%d')}"
         all_results = []
-        seen_titles = set() # 중복 제거용
+        seen_titles = set()
         
         query = f'"{keyword}"'
         max_pages = (max_articles // 10) + 1
         
+        st.info("🔍 검색 시작... (디버깅 로그가 출력됩니다)") # [Debug]
+
         for page in range(max_pages):
             if len(all_results) >= max_articles: break
             
@@ -49,79 +51,87 @@ class NewsScraper:
             url = f"https://search.naver.com/search.naver?where=news&query={query}&sm=tab_pge&sort=1&photo=0&pd=3&ds={ds}&de={de}&nso={nso}&start={start_val}"
             
             try:
-                res = self.scraper.get(url, headers=self.headers, timeout=10)
-                soup = BeautifulSoup(res.content, 'html.parser')
+                # [Debug] 요청 URL 확인
+                st.write(f"--- Page {page+1} 요청 중: {url} ---")
                 
-                # [핵심 로직] entry.bootstrap 안의 JSON 데이터 추출
+                res = self.scraper.get(url, headers=self.headers, timeout=10)
+                
+                # [Debug] 응답 코드 확인
+                if res.status_code != 200:
+                    st.error(f"❌ 접속 실패! 상태 코드: {res.status_code}")
+                    continue
+                
+                # [Debug] HTML 내용 살짝 확인
+                if "검색결과가 없습니다" in res.text:
+                    st.warning("⚠️ 네이버 왈: '검색결과가 없습니다'")
+                    break
+                    
+                if 'entry.bootstrap' not in res.text:
+                    st.error("❌ HTML에서 'entry.bootstrap'을 찾을 수 없습니다.")
+                    st.text(f"가져온 HTML 앞부분(500자): {res.text[:500]}")
+                    # 봇 탐지 걸렸을 때 보통 캡차 페이지나 심플한 HTML이 뜹니다.
+                    continue
+                else:
+                    st.success("✅ 'entry.bootstrap' 스크립트 발견!")
+
+                soup = BeautifulSoup(res.content, 'html.parser')
                 scripts = soup.find_all('script')
                 json_data = None
                 
                 for script in scripts:
                     if 'entry.bootstrap' in script.text:
-                        # 정규식으로 entry.bootstrap(..., { JSON }); 패턴에서 JSON 부분만 추출
-                        # (?<=...): 긍정형 후방 탐색, document.getElementById(...) 뒤에 오는 {,} 패턴 찾기
+                        # [Debug] 정규식 매칭 시도
                         match = re.search(r'entry\.bootstrap\(document\.getElementById\(".*?"\), ({.*})\);', script.text)
                         if match:
                             try:
                                 json_str = match.group(1)
                                 json_data = json.loads(json_str)
+                                st.success("✅ JSON 데이터 추출 및 파싱 성공!")
                                 break
-                            except:
-                                continue
+                            except json.JSONDecodeError as je:
+                                st.error(f"❌ JSON 파싱 에러: {je}")
+                        else:
+                            st.warning("⚠️ 스크립트는 찾았으나 정규식 매칭 실패 (패턴 불일치)")
 
                 if not json_data:
-                    # JSON 추출 실패 시 다음 페이지로 (혹은 HTML 파싱 폴백 가능하나 여기선 패스)
+                    st.error("❌ 유효한 JSON 데이터를 얻지 못했습니다. 다음 페이지로..")
                     continue
 
-                # JSON 구조 탐색: body -> props -> children 리스트
-                try:
-                    items_list = json_data.get('body', {}).get('props', {}).get('children', [])
-                except:
-                    items_list = []
+                # JSON 데이터 구조 확인
+                items_list = json_data.get('body', {}).get('props', {}).get('children', [])
+                st.write(f"📊 추출된 아이템 수: {len(items_list)}") # [Debug]
 
                 for item in items_list:
                     if len(all_results) >= max_articles: break
                     
-                    # 템플릿 ID가 newsItem인 것만 처리 (광고 등 제외)
                     if item.get('templateId') != 'newsItem':
                         continue
                         
                     props = item.get('props', {})
-                    
-                    # 1. 제목 및 원본 링크
                     raw_title = props.get('title', '')
-                    # HTML 태그 제거 (mark 태그 등)
                     clean_title = re.sub('<[^<]+?>', '', raw_title)
                     original_link = props.get('titleHref', '')
                     
-                    # 중복 제거
                     if clean_title in seen_titles: continue
                     seen_titles.add(clean_title)
 
-                    # 2. 언론사 정보
                     source_info = props.get('sourceProfile', {})
                     press_name = source_info.get('title', '알 수 없음')
 
-                    # 3. 추가 정보 (지면, 네이버뉴스 링크 등)
                     sub_texts = props.get('subTexts', [])
-                    
                     is_naver = False
                     final_link = original_link
                     paper_info = ""
 
                     for sub in sub_texts:
-                        # (1) 네이버 뉴스 링크 확인
-                        # JSON 구조상 "text": "네이버뉴스" 이고 "textHref"가 존재함
                         if sub.get('text') == '네이버뉴스' and sub.get('textHref'):
                             is_naver = True
                             final_link = sub.get('textHref')
                         
-                        # (2) 지면 정보 확인 (예: "A10면", "1면")
                         txt = sub.get('text', '')
                         if txt and re.search(r'^\s*[A-Za-z]*\d+면', txt):
                             paper_info = f" ({txt})"
 
-                    # 제목에 지면 정보 붙이기
                     full_title = f"{clean_title}{paper_info}"
 
                     all_results.append({
@@ -134,10 +144,13 @@ class NewsScraper:
                 time.sleep(0.1)
                 
             except Exception as e:
-                print(f"Error processing page {page}: {e}")
+                st.error(f"❌ 에러 발생: {e}")
                 continue
-                
+        
+        st.info(f"🏁 최종 수집된 기사 수: {len(all_results)}")
         return all_results
+
+
 
 # --- [3. UI 설정] ---
 st.set_page_config(page_title="Totta Scriptor", layout="wide")
