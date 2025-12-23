@@ -146,8 +146,8 @@ st.markdown("""
     }
     .bg-white { background: white !important; }
     .bg-scraped { background: #eee !important; border-left: 4px solid #888 !important; opacity: 0.7; }
-    .news-title { font-size: 14px !important; font-weight: 600; color: #333; line-height: 1.2; margin-bottom: 2px; }
-    .news-meta { font-size: 11px !important; color: #666; }
+    .news-title { font-size: 17px !important; font-weight: 600; color: #333; line-height: 1.2; margin-bottom: 2px; }
+    .news-meta { font-size: 14px !important; color: #666; }
     </style>
     """, unsafe_allow_html=True)
 
