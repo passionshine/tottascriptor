@@ -211,13 +211,16 @@ with st.expander("🔍 뉴스 검색 설정", expanded=True):
     if st.button("🚀 뉴스 검색 시작", type="primary", use_container_width=True):
         st.session_state.search_results = NewsScraper().fetch_news(sd, ed, kw, mx)
 
-# 3. 뉴스 리스트 출력 함수 (중복 체크 메시지 추가)
+# 3. 뉴스 리스트 출력 함수 (중복 체크 메시지 추가 + 날짜 제거)
 def display_list(title, items, key_p):
     st.markdown(f'<div class="section-header">{title} ({len(items)}건)</div>', unsafe_allow_html=True)
     for i, res in enumerate(items):
         d_val = res.get('date', '')
-        d_str = f"[{d_val}] " if d_val else ""
-        item_txt = f"ㅇ {d_str}{res['title']}_{res['press']}\n{res['link']}\n\n"
+        # 화면 표시용 날짜 포맷
+        d_str_display = f"[{d_val}] " if d_val else ""
+        
+        # [수정] 스크랩 결과 텍스트에는 날짜를 제외함
+        item_txt = f"ㅇ {res['title']}_{res['press']}\n{res['link']}\n\n"
         
         is_scraped = (item_txt in st.session_state.corp_list) or (item_txt in st.session_state.rel_list)
         bg = "bg-scraped" if is_scraped else ""
@@ -234,9 +237,9 @@ def display_list(title, items, key_p):
             with st.container(border=True):
                 b1, b2, b3 = st.columns(3, gap="small")
                 with b1: 
-                    st.link_button("원문", res['link'], use_container_width=True)
+                    st.link_button("원문보기", res['link'], use_container_width=True)
                 with b2:
-                    if st.button("공사", key=f"c_{key_p}_{i}", use_container_width=True):
+                    if st.button("공사 기사", key=f"c_{key_p}_{i}", use_container_width=True):
                         if item_txt not in st.session_state.corp_list:
                             st.session_state.corp_list.append(item_txt)
                             st.toast("🏢 공사 관련 보도로 스크랩되었습니다!", icon="✅")
@@ -245,7 +248,7 @@ def display_list(title, items, key_p):
                         else:
                             st.toast("⚠️ 이미 스크랩된 기사입니다.", icon="❗")
                 with b3:
-                    if st.button("기타", key=f"r_{key_p}_{i}", use_container_width=True):
+                    if st.button("기타 기사", key=f"r_{key_p}_{i}", use_container_width=True):
                         if item_txt not in st.session_state.rel_list:
                             st.session_state.rel_list.append(item_txt)
                             st.toast("🚆 유관기관 관련 보도로 스크랩되었습니다!", icon="✅")
