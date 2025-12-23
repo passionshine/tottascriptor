@@ -190,7 +190,7 @@ if st.session_state.search_results:
                         st.rerun()
             with col4:
                 if st.button("유관+", key=f"r_{i}"):
-                    item = f"ㅇ {res['title']}_{res['press']}\n{res['link']}\n\n"1            
+                    item = f"ㅇ {res['title']}_{res['press']}\n{res['link']}\n\n"         
                     st.toast("🚆 유관 섹션 추가!")
                     if item not in st.session_state.rel_list:
                         st.session_state.rel_list.append(item)
