@@ -221,7 +221,7 @@ if st.session_state.search_results:
         # 컬럼 비율 조정 및 정렬
         with st.container():
             # 비율 수정: 버튼들이 너무 좁아지지 않도록 0.1 -> 0.12 등으로 조정
-            col1, col2, col3, col4 = st.columns([0.64, 0.12, 0.12, 0.12]) 
+            col1, col2, col3, col4 = st.columns([0.73, 0.09, 0.09, 0.09])
             
             with col1:
                 st.markdown(f'''
