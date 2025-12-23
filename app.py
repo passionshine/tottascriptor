@@ -26,7 +26,7 @@ def get_target_date():
         target += datetime.timedelta(days=1)
     return target
 
-# --- [2. 뉴스 스크립터 (요약 기능 및 시간 파싱 강화)] ---
+# --- [2. 뉴스 스크립터 (요약 25자 제한 기능)] ---
 class NewsScraper:
     def __init__(self):
         self.scraper = cloudscraper.create_scraper()
@@ -77,9 +77,15 @@ class NewsScraper:
                                 break
                     
                     if card:
-                        # 요약문(Snippet) 추출
-                        dsc_el = card.select_one(".api_txt_lines.dsc_txt_it, .news_dsc")
-                        summary = dsc_el.get_text(strip=True) if dsc_el else "요약 정보가 없습니다."
+                        # [변경] 요약문 파싱 및 25자 제한
+                        # .sds-comps-text 포함하여 다양한 클래스 탐색
+                        dsc_el = card.select_one(".api_txt_lines.dsc_txt_it, .news_dsc, .sds-comps-text")
+                        if dsc_el:
+                            raw_summary = dsc_el.get_text(strip=True)
+                            # 25자 넘으면 자르고 ... 붙이기
+                            summary = raw_summary[:25] + "..." if len(raw_summary) > 25 else raw_summary
+                        else:
+                            summary = ""
                         
                         naver_btn = card.select_one('a[href*="n.news.naver.com"]')
                         final_link = naver_btn.get('href') if naver_btn else original_link
@@ -129,11 +135,12 @@ st.markdown("""
     .news-card { 
         padding: 12px 16px; border-radius: 8px; border-left: 5px solid #007bff; 
         box-shadow: 0 2px 4px rgba(0,0,0,0.08); background: white; margin-bottom: 5px;
+        min-height: 90px; display: flex; flex-direction: column; justify-content: center;
     }
     .bg-scraped { background: #f8f9fa !important; border-left: 5px solid #adb5bd !important; opacity: 0.7; }
-    .news-title { font-size: 15px !important; font-weight: 700; color: #222; margin-bottom: 3px; line-height: 1.4; }
-    .news-summary { font-size: 12.5px !important; color: #555; margin-bottom: 8px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-    .news-meta { font-size: 12px !important; color: #666; }
+    .news-title { font-size: 15px !important; font-weight: 700; color: #222; margin-bottom: 4px; line-height: 1.4; }
+    .news-summary { font-size: 13px !important; color: #666; margin-bottom: 6px; letter-spacing: -0.3px; }
+    .news-meta { font-size: 12px !important; color: #888; }
     
     /* 버튼 그룹 간격 축소 및 스타일 */
     div[data-testid="column"] { padding: 0 !important; }
@@ -196,14 +203,16 @@ def display_list(title, items, key_p):
 
         col_m, col_b = st.columns([0.7, 0.3], gap="small")
         with col_m:
+            # 요약문이 있을 때만 표시
+            summary_html = f'<div class="news-summary">{res["summary"]}</div>' if res['summary'] else ""
+            
             st.markdown(f"""<div class="news-card {bg}">
                 <div class="news-title">{res['title']}</div>
-                <div class="news-summary">{res['summary']}</div>
+                {summary_html}
                 <div class="news-meta"><span style="color:#007bff;font-weight:bold;">{d_val}</span> | {res['press']}</div>
             </div>""", unsafe_allow_html=True)
         
         with col_b:
-            # 버튼 3개를 1/3씩 배분 (gap 수정 완료)
             b1, b2, b3 = st.columns(3, gap="small")
             with b1: st.link_button("원문", res['link'])
             with b2:
