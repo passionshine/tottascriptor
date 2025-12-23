@@ -72,10 +72,8 @@ st.set_page_config(page_title="또타 스크립터", layout="wide")
 
 st.markdown("""
     <style>
-    /* 수평 간격 제거 */
+    /* 수평 간격 제거 및 가로 배치 강제 */
     [data-testid="stHorizontalBlock"] { gap: 0rem !important; }
-    
-    /* 컬럼 가로 배치 강제 */
     div[data-testid="column"] {
         padding: 0px 1px !important;
         flex-direction: row !important;
@@ -90,16 +88,21 @@ st.markdown("""
         padding: 0px !important; border-radius: 4px !important;
     }
 
-    /* 버튼 색상 */
+    /* 버튼 색상: 파스텔 블루 / 파스텔 연두 */
     div[data-testid="column"]:nth-of-type(3) button { background-color: #D1E9FF !important; color: #004085 !important; border: 1px solid #B8DAFF !important; }
     div[data-testid="column"]:nth-of-type(4) button { background-color: #E2F0D9 !important; color: #385723 !important; border: 1px solid #C5E0B4 !important; }
 
-    /* 뉴스 카드 */
+    /* 뉴스 카드 기본 스타일 */
     .news-card {
-        background: white; padding: 10px; border-radius: 8px;
+        padding: 10px; border-radius: 8px;
         border-left: 5px solid #007bff; box-shadow: 0 1px 2px rgba(0,0,0,0.1);
         width: 100%;
     }
+    /* 스크랩 전 배경 */
+    .bg-white { background: white !important; }
+    /* 스크랩 후 배경 */
+    .bg-scraped { background: #F0F2F6 !important; border-left: 5px solid #999 !important; opacity: 0.8; }
+
     .news-title { 
         font-size: 13px !important; font-weight: 700; color: #111; line-height: 1.3;
         white-space: normal !important; word-break: keep-all;
@@ -132,36 +135,40 @@ with c_b:
 
 st.divider()
 
-# 2. 검색 및 날짜 필터 설정 (복구됨)
+# 2. 검색 설정
 with st.expander("🔍 검색 및 날짜 설정", expanded=True):
     keyword = st.text_input("검색어", value="서울교통공사")
-    
     col_d1, col_d2 = st.columns(2)
-    with col_d1:
-        start_d = st.date_input("시작일", datetime.date.today() - datetime.timedelta(days=1))
-    with col_d2:
-        end_d = st.date_input("종료일", datetime.date.today())
-        
+    with col_d1: start_d = st.date_input("시작일", datetime.date.today() - datetime.timedelta(days=1))
+    with col_d2: end_d = st.date_input("종료일", datetime.date.today())
     max_a = st.slider("최대 기사 수", 10, 100, 30)
-    
     if st.button("🚀 뉴스 검색 시작", type="primary", use_container_width=True):
         st.session_state.search_results = NewsScraper().fetch_news(start_d, end_d, keyword, max_a)
         st.rerun()
 
-# 3. 뉴스 리스트
+# 3. 뉴스 리스트 출력 (색상 반전 로직 적용)
 if st.session_state.search_results:
     for i, res in enumerate(st.session_state.search_results):
+        # 스크랩 여부 확인용 문자열 생성
+        item_check = f"ㅇ {res['title']}_{res['press']}\n{res['link']}\n\n"
+        is_scraped = (item_check in st.session_state.corp_list) or (item_check in st.session_state.rel_list)
+        bg_class = "bg-scraped" if is_scraped else "bg-white"
+
         with st.container():
             col1, col2, col3, col4 = st.columns([0.73, 0.09, 0.09, 0.09])
             with col1:
-                st.markdown(f'<div class="news-card"><div class="news-title">{res["title"]}</div><div class="news-meta">[{res["press"]}]</div></div>', unsafe_allow_html=True)
+                st.markdown(f'''
+                <div class="news-card {bg_class}">
+                    <div class="news-title">{res["title"]}</div>
+                    <div class="news-meta">[{res["press"]}] {"(스크랩됨)" if is_scraped else ""}</div>
+                </div>
+                ''', unsafe_allow_html=True)
             with col2:
                 st.link_button("원문", res['link'])
             with col3:
                 if st.button("공사+", key=f"c_{i}"):
-                    item = f"ㅇ {res['title']}_{res['press']}\n{res['link']}\n\n"
-                    if item not in st.session_state.corp_list:
-                        st.session_state.corp_list.append(item)
+                    if item_check not in st.session_state.corp_list:
+                        st.session_state.corp_list.append(item_check)
                         st.toast("🏢 공사 추가 완료!")
                         time.sleep(0.3)
                         st.rerun()
@@ -169,9 +176,8 @@ if st.session_state.search_results:
                         st.toast("⚠️ 이미 추가된 기사입니다.")
             with col4:
                 if st.button("유관+", key=f"r_{i}"):
-                    item = f"ㅇ {res['title']}_{res['press']}\n{res['link']}\n\n"
-                    if item not in st.session_state.rel_list:
-                        st.session_state.rel_list.append(item)
+                    if item_check not in st.session_state.rel_list:
+                        st.session_state.rel_list.append(item_check)
                         st.toast("🚆 유관 추가 완료!")
                         time.sleep(0.3)
                         st.rerun()
