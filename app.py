@@ -182,20 +182,20 @@ if st.session_state.search_results:
     for i, res in enumerate(display_results):
         with st.container():
             # 모바일에서도 7:1:1:1 비율 유지 시도
-            col1, col2, col3, col4 = st.columns([0.64, 0.12, 0.12, 0.12])
+            col1, col2, col3, col4 = st.columns([0.76, 0.8, 0.8, 0.8])
             with col1:
                 st.markdown(f'<div class="news-card"><div class="news-title">{res["title"]}</div><div class="news-meta">[{res["press"]}] {res["time"]}</div></div>', unsafe_allow_html=True)
             with col2:
                 st.link_button("원문", res['link'])
             with col3:
-                if st.button("공사+", key=f"c_{i}"):
+                if st.button("공사보도", key=f"c_{i}"):
                     item = f"ㅇ {res['title']}_{res['press']}\n{res['link']}\n\n"
                     if item not in st.session_state.corp_list:
                         st.session_state.corp_list.append(item)
                         st.toast(f"🏢 공사 섹션 추가 완료", icon="✅")
                         st.rerun()
             with col4:
-                if st.button("유관+", key=f"r_{i}"):
+                if st.button("유관기관 보도", key=f"r_{i}"):
                     item = f"ㅇ {res['title']}_{res['press']}\n{res['link']}\n\n"
                     if item not in st.session_state.rel_list:
                         st.session_state.rel_list.append(item)
