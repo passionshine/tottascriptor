@@ -72,7 +72,7 @@ st.set_page_config(page_title="Totta Scriptor", layout="wide")
 
 st.markdown("""
     <style>
-    /* 1. 수평 블록 간격 제어 */
+    /* 1. 수평 블록 간격 제어 (4px) */
     [data-testid="stHorizontalBlock"] {
         gap: 4px !important;
         align-items: center !important; 
@@ -86,7 +86,7 @@ st.markdown("""
         justify-content: center !important; 
     }
 
-    /* 3. 버튼 기본 스타일 */
+    /* 3. 버튼 기본 스타일 (좌우 패딩 5px) */
     .stButton { width: 100% !important; margin: 0 !important; }
     .stButton > button {
         width: 100% !important;
@@ -150,8 +150,8 @@ st.markdown("""
         font-size: 18px;
         font-weight: 700;
         color: #333;
-        margin-top: 20px;
-        margin-bottom: 10px;
+        margin-top: 25px;
+        margin-bottom: 15px;
         border-bottom: 2px solid #007bff;
         padding-bottom: 5px;
         display: inline-block;
@@ -218,12 +218,12 @@ with st.expander("🔍 뉴스 검색 설정", expanded=True):
         st.session_state.search_results = NewsScraper().fetch_news(start_d, end_d, keyword, max_a)
         st.rerun()
 
-# 3. 뉴스 리스트 (섹션 분리 로직 적용)
+# 3. 뉴스 리스트 출력 함수 (공통 사용)
 def display_news_section(title, articles, section_key):
     st.markdown(f'<div class="section-header">{title} ({len(articles)}건)</div>', unsafe_allow_html=True)
     
     if not articles:
-        st.info("해당 분류의 기사가 없습니다.")
+        st.caption("검색된 기사가 없습니다.")
         return
 
     for i, res in enumerate(articles):
@@ -260,18 +260,19 @@ def display_news_section(title, articles, section_key):
         
         st.markdown("<hr style='margin: 3px 0; border: none; border-top: 1px solid #f0f0f0;'>", unsafe_allow_html=True)
 
+# 4. 결과 출력 로직 (분류 적용)
 if st.session_state.search_results:
-    # 데이터 분류
-    naver_news = []
-    other_news = []
+    # URL에 'news.naver.com'이 있는지 확인하여 리스트 분리
+    naver_news = [
+        item for item in st.session_state.search_results 
+        if "news.naver.com" in item['link']
+    ]
+    other_news = [
+        item for item in st.session_state.search_results 
+        if "news.naver.com" not in item['link']
+    ]
     
-    for item in st.session_state.search_results:
-        if "news.naver.com" in item['link']:
-            naver_news.append(item)
-        else:
-            other_news.append(item)
-            
     # 섹션별 출력
     display_news_section("🟢 네이버 뉴스", naver_news, "naver")
-    st.write("") # 간격
+    st.write("") 
     display_news_section("🌐 언론사 자체 기사", other_news, "press")
