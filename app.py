@@ -125,10 +125,10 @@ st.markdown("""
         min-height: 50px;
     }
     .news-title { 
-        font-size: 15px !important; font-weight: 700; color: #111; 
+        font-size: 17px !important; font-weight: 700; color: #111; 
         line-height: 1.3; word-break: keep-all; 
     }
-    .news-meta { font-size: 11px !important; color: #666; margin-top: 3px; }
+    .news-meta { font-size: 14px !important; color: #666; margin-top: 3px; }
     </style>
     """, unsafe_allow_html=True)
 
