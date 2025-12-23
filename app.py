@@ -173,7 +173,7 @@ st.markdown("""
         width: 100% !important; 
         height: 36px !important; /* 높이 통일 */
         border-radius: 6px !important; 
-        font-size: 13px !important;
+        font-size: 11px !important;
         font-weight: 600 !important;
         padding: 0px 5px !important;
         border: 1px solid #e0e0e0 !important;
@@ -352,4 +352,5 @@ if st.session_state.search_results:
     display_list("🟢 네이버 뉴스", naver_news, "n")
     st.write("")
     display_list("🌐 언론사 자체 기사", other_news, "o")
+
 
