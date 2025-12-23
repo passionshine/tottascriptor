@@ -33,24 +33,29 @@ def get_target_date():
         target += datetime.timedelta(days=1)
     return target
 
-# --- [2. 뉴스 스크래퍼] ---
+# --- [2. 뉴스 스크래퍼 (수정됨)] ---
 class NewsScraper:
     def __init__(self):
         self.scraper = cloudscraper.create_scraper()
+        # 헤더를 모바일이 아닌 PC 버전으로 명시하여 구조 통일
         self.headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'Referer': 'https://www.naver.com/'
+            'Referer': 'https://search.naver.com/'
         }
 
     def fetch_news(self, start_d, end_d, keyword, max_articles):
         ds, de = start_d.strftime("%Y.%m.%d"), end_d.strftime("%Y.%m.%d")
-        nso = f"so:dd,p:from{start_d.strftime('%Y%m%d')}to{end_d.strftime('%Y%m%d')}"
+        ds_param = start_d.strftime("%Y%m%d")
+        de_param = end_d.strftime("%Y%m%d")
+        
+        # 정확한 날짜 필터링을 위한 파라미터 (so:dd = 최신순, p:from~to = 기간)
+        nso = f"so:dd,p:from{ds_param}to{de_param},a:all"
         
         all_results = []
         seen_links = set()
         
         query = f'"{keyword}"'
-        max_pages = (max_articles // 10) + 1
+        max_pages = (max_articles // 10) + 2  # 여유있게 페이지 계산
         
         status_text = st.empty()
         progress_bar = st.progress(0)
@@ -61,12 +66,12 @@ class NewsScraper:
         for page in range(1, max_pages + 1):
             if len(all_results) >= max_articles: break
             
-            current_progress = min(page / max_pages, 1.0)
+            current_progress = min(len(all_results) / max_articles, 1.0)
             progress_bar.progress(current_progress)
-            status_text.text(f"⏳ {page}/{max_pages}페이지 분석 중... (현재 {len(all_results)}건)")
+            status_text.text(f"⏳ {page}페이지 분석 중... (현재 {len(all_results)}건)")
             
             start_index = (page - 1) * 10 + 1
-            url = f"https://search.naver.com/search.naver?where=news&query={query}&sm=tab_pge&sort=1&photo=0&pd=3&ds={ds}&de={de}&nso={nso}&qdt=1&start={start_index}"
+            url = f"https://search.naver.com/search.naver?where=news&query={query}&sm=tab_pge&sort=1&photo=0&pd=3&ds={ds}&de={de}&nso={nso}&start={start_index}"
             
             try:
                 response = self.scraper.get(url, headers=self.headers, timeout=10)
@@ -75,70 +80,75 @@ class NewsScraper:
                     continue
 
                 soup = BeautifulSoup(response.content, 'html.parser')
-                items = soup.select('a[data-heatmap-target=".tit"]')
-                if not items: items = soup.select('a.news_tit')
+                
+                # 뉴스 카드 리스트 가져오기 (news_wrap 클래스 사용)
+                items = soup.select('.news_wrap')
                 
                 if not items:
-                    with log_container: st.warning(f"⚠️ {page}페이지: 기사를 찾을 수 없습니다.")
+                    with log_container: st.warning(f"⚠️ {page}페이지: 더 이상 기사가 없습니다.")
                     break
 
-                for t_tag in items:
+                for card in items:
                     if len(all_results) >= max_articles: break
 
-                    title = t_tag.get_text(strip=True)
-                    original_link = t_tag.get('href')
+                    # 1. 제목 및 링크 추출
+                    title_tag = card.select_one('a.news_tit')
+                    if not title_tag: continue
                     
-                    card = None
-                    curr = t_tag
-                    for _ in range(5):
-                        if curr.parent:
-                            curr = curr.parent
-                            if curr.select_one(".sds-comps-profile") or curr.select_one(".news_info") or 'bx' in curr.get('class', []):
-                                card = curr
-                                break
+                    title = title_tag.get_text(strip=True)
+                    original_link = title_tag.get('href')
                     
-                    final_link = original_link
-                    is_naver = "n.news.naver.com" in original_link
+                    # 2. 언론사 및 날짜 추출 (정확도 개선)
                     press_name = "알 수 없음"
-                    paper_info = ""
                     article_date = ""
-                    is_paper = False # 지면 기사 여부
+                    is_paper = False
+                    paper_info = ""
 
-                    if card:
-                        naver_btn = card.select_one('a[href*="n.news.naver.com"]')
-                        if naver_btn:
-                            final_link = naver_btn.get('href')
-                            is_naver = True
-                        
-                        press_el = card.select_one(".sds-comps-profile-info-title-text, .press_name, .info.press")
+                    # info_group 안에서 순회하며 정보 찾기
+                    info_group = card.select_one('.info_group')
+                    if info_group:
+                        # 언론사 찾기 (press 클래스)
+                        press_el = info_group.select_one('.press')
                         if press_el: press_name = press_el.get_text(strip=True)
                         
-                        full_text = card.get_text(separator=" ", strip=True)
-                        
-                        # 날짜 파싱
-                        date_match = re.search(r'(\d+[분시일주초]\s?전|방금\s?전)', full_text)
+                        # 날짜 및 지면 정보 찾기 (info 클래스 중 press가 아닌 것)
+                        infos = info_group.select('.info')
+                        for info in infos:
+                            text = info.get_text(strip=True)
+                            if "면" in text and "전" not in text: # 지면 정보 (예: A10면)
+                                is_paper = True
+                                paper_info = " (지면)"
+                            elif re.search(r'\d{4}\.\d{2}\.\d{2}|\d+[분시일주초]\s?전|방금\s?전', text):
+                                # 이미 날짜를 찾았는데 또 나오면(수정일 등) 무시하거나 덮어쓰기
+                                if not article_date: 
+                                    article_date = text
+
+                    # 날짜가 여전히 비어있다면 백업 로직 (전체 텍스트에서 검색하지 않음)
+                    if not article_date:
+                        date_match = re.search(r'(\d{4}\.\d{2}\.\d{2})', card.get_text())
                         if date_match: article_date = date_match.group(1)
-                        else:
-                            date_match_2 = re.search(r'(\d{4}\.\d{2}\.\d{2}\.?)', full_text)
-                            if date_match_2: article_date = date_match_2.group(1)
 
-                        # [수정] 지면 정보 파싱 -> "(지면)"으로 통일
-                        paper_match = re.search(r'([A-Za-z]*\d+면)', full_text)
-                        if paper_match:
-                            paper_info = " (지면)" # 구체적 숫자 대신 (지면) 표시
-                            is_paper = True
+                    # 3. 네이버 뉴스 링크 확인
+                    final_link = original_link
+                    is_naver = "n.news.naver.com" in original_link
+                    
+                    naver_btn = card.select_one('a.info[href*="n.news.naver.com"]')
+                    if naver_btn:
+                        final_link = naver_btn.get('href')
+                        is_naver = True
 
-                    full_title = f"{title}{paper_info}"
-
+                    # 4. 중복 제거
                     if final_link in seen_links: continue
                     seen_links.add(final_link)
+                    
+                    full_title = f"{title}{paper_info}"
                     
                     all_results.append({
                         'title': full_title,
                         'link': final_link,
                         'press': press_name,
                         'is_naver': is_naver,
-                        'is_paper': is_paper, # 분류를 위해 플래그 추가
+                        'is_paper': is_paper,
                         'date': article_date
                     })
                     
@@ -187,18 +197,18 @@ st.markdown("""
         width: 100% !important; 
         height: 36px !important; 
         border-radius: 6px !important; 
-        font-size: 13px !important;
-        font-weight: 600 !important;
-        padding: 0px 5px !important;
-        border: 1px solid #e0e0e0 !important;
-        background-color: white !important;
-        color: #555 !important;
-        box-shadow: 0 1px 2px rgba(0,0,0,0.05) !important;
+        font-size: 13px !important; 
+        font-weight: 600 !important; 
+        padding: 0px 5px !important; 
+        border: 1px solid #e0e0e0 !important; 
+        background-color: white !important; 
+        color: #555 !important; 
+        box-shadow: 0 1px 2px rgba(0,0,0,0.05) !important; 
     }
     .stButton > button:hover, .stLinkButton > a:hover {
-        border-color: #007bff !important;
-        color: #007bff !important;
-        background-color: #f0f7ff !important;
+        border-color: #007bff !important; 
+        color: #007bff !important; 
+        background-color: #f0f7ff !important; 
     }
     .section-header { font-size: 18px; font-weight: 700; color: #333; margin-top: 30px; margin-bottom: 15px; border-bottom: 2px solid #007bff; display: inline-block; }
     
@@ -332,21 +342,15 @@ def display_list(title, items, key_prefix):
         
         st.markdown("<div style='margin-bottom: 6px;'></div>", unsafe_allow_html=True)
 
-# [핵심 변경] 결과 분류 로직
+# 결과 분류 로직
 if st.session_state.search_results:
-    # 1. 지면 기사 (is_paper == True)
     paper_news = [x for x in st.session_state.search_results if x.get('is_paper')]
-    
-    # 2. 네이버 뉴스 (is_naver == True 이면서 지면 기사가 아닌 것)
     naver_news = [x for x in st.session_state.search_results if x.get('is_naver') and not x.get('is_paper')]
-    
-    # 3. 기타 뉴스 (나머지)
     other_news = [x for x in st.session_state.search_results if not x.get('is_naver') and not x.get('is_paper')]
     
-    # 순서대로 출력 (지면 보도가 최상단)
     if paper_news:
         display_list("📰 지면 보도", paper_news, "p")
-        st.write("") # 간격
+        st.write("") 
         
     display_list("🟢 네이버 뉴스", naver_news, "n")
     st.write("")
