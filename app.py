@@ -23,7 +23,7 @@ def get_target_date():
         target += datetime.timedelta(days=1)
     return target
 
-# --- [2. 뉴스 스크래퍼 (만능 텍스트 스캔 적용)] ---
+# --- [2. 뉴스 스크래퍼] ---
 class NewsScraper:
     def __init__(self):
         self.scraper = cloudscraper.create_scraper()
@@ -65,10 +65,7 @@ class NewsScraper:
                     continue
 
                 soup = BeautifulSoup(response.content, 'html.parser')
-                
-                # 1차 시도
                 items = soup.select('a[data-heatmap-target=".tit"]')
-                # 2차 시도
                 if not items: items = soup.select('a.news_tit')
                 
                 if not items:
@@ -81,7 +78,6 @@ class NewsScraper:
                     title = t_tag.get_text(strip=True)
                     original_link = t_tag.get('href')
                     
-                    # 부모 카드 찾기
                     card = None
                     curr = t_tag
                     for _ in range(5):
@@ -98,37 +94,23 @@ class NewsScraper:
                     article_date = ""
 
                     if card:
-                        # 1. 네이버 뉴스 링크
                         naver_btn = card.select_one('a[href*="n.news.naver.com"]')
                         if naver_btn:
                             final_link = naver_btn.get('href')
                             is_naver = True
                         
-                        # 2. 언론사 이름
                         press_el = card.select_one(".sds-comps-profile-info-title-text, .press_name, .info.press")
-                        if press_el:
-                            press_name = press_el.get_text(strip=True)
+                        if press_el: press_name = press_el.get_text(strip=True)
                         
-                        # 3. [최강 파싱 로직] 카드의 모든 텍스트 조각을 하나하나 검사
-                        # stripped_strings는 태그 안의 순수 텍스트만 리스트로 반환합니다.
-                        # 예: ["서울교통공사", "적자 감축", "이데일리", "2분 전", "네이버뉴스"]
-                        for txt in card.stripped_strings:
-                            
-                            # (A) 날짜 패턴 (우선순위: 분/시/일/주 전 > 방금 전 > YYYY.MM.DD)
-                            if not article_date:
-                                if re.search(r'(\d+[분시일주초]\s?전|방금\s?전)', txt):
-                                    article_date = txt
-                                elif re.search(r'(\d{4}\.\d{2}\.\d{2}\.?)', txt):
-                                    article_date = txt
-                            
-                            # (B) 지면 정보 (A1면 등)
-                            if not paper_info:
-                                if re.search(r'([A-Za-z]*\d+면)', txt):
-                                    paper_info = f" ({txt})"
-                            
-                            # 둘 다 찾았으면 더 이상 루프 돌 필요 없음
-                            if article_date and paper_info:
-                                break
+                        full_text = card.get_text(separator=" ", strip=True)
+                        date_match = re.search(r'(\d+[분시일주초]\s?전|방금\s?전)', full_text)
+                        if date_match: article_date = date_match.group(1)
+                        else:
+                            date_match_2 = re.search(r'(\d{4}\.\d{2}\.\d{2}\.?)', full_text)
+                            if date_match_2: article_date = date_match_2.group(1)
+
+                        paper_match = re.search(r'([A-Za-z]*\d+면)', full_text)
+                        if paper_match: paper_info = f" ({paper_match.group(1)})"
 
                     full_title = f"{title}{paper_info}"
 
@@ -162,39 +144,57 @@ st.set_page_config(page_title="Totta Scraper", layout="wide")
 
 st.markdown("""
     <style>
-    /* 전체 레이아웃 간격 조정 */
-    [data-testid="stHorizontalBlock"] { gap: 10px !important; align-items: start !important; }
-    div[data-testid="column"], div[data-testid="stColumn"] { padding: 0px !important; display: flex !important; justify-content: center !important; }
-    
-    /* 버튼 스타일 */
-    .stButton > button { width: 100% !important; height: 38px !important; border-radius: 6px !important; }
-    .stLinkButton > a { width: 100% !important; height: 38px !important; display: flex; align-items: center; justify-content: center; font-size: 11px !important; }
-    
-    /* [수정] 뉴스 카드 스타일 - 간격 추가 */
-    .news-card { 
-        padding: 10px 14px; 
-        border-radius: 8px; 
-        border-left: 5px solid #007bff; 
-        box-shadow: 0 1px 3px rgba(0,0,0,0.1); 
-        display: flex; 
-        flex-direction: column; 
-        justify-content: center; 
-        height: 100%;
-        margin-right: 15px !important; /* [추가] 오른쪽 버튼과 간격 벌리기 */
-        margin-bottom: 5px !important; 
+    /* [핵심] 컬럼 간 수직 중앙 정렬 */
+    div[data-testid="column"] { 
+        display: flex !important; 
+        flex-direction: column !important; 
+        justify-content: center !important; 
     }
     
-    .bg-scraped { background: #f1f3f5 !important; border-left: 5px solid #adb5bd !important; opacity: 0.8; }
-    .bg-white { background: white !important; }
+    /* 뉴스 카드 스타일 */
+    .news-card { 
+        padding: 12px 16px; 
+        border-radius: 8px; 
+        border-left: 5px solid #007bff; 
+        box-shadow: 0 2px 4px rgba(0,0,0,0.08); 
+        background: white;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+    }
+    .bg-scraped { background: #f8f9fa !important; border-left: 5px solid #adb5bd !important; opacity: 0.7; }
     
-    .news-title { font-size: 16px !important; font-weight: 600; color: #333; line-height: 1.3; margin-bottom: 4px; }
-    .news-meta { font-size: 13px !important; color: #666; }
+    .news-title { font-size: 16px !important; font-weight: 700; color: #222; margin-bottom: 5px; line-height: 1.3; }
+    .news-meta { font-size: 13px !important; color: #666; font-weight: 500; }
     
-    .section-header { font-size: 18px; font-weight: 700; color: #333; margin-top: 30px; margin-bottom: 15px; border-bottom: 2px solid #007bff; display: inline-block; }
+    /* 버튼 스타일 (작고 깔끔하게) */
+    .stButton > button, .stLinkButton > a { 
+        width: 100% !important; 
+        height: 36px !important; /* 높이 통일 */
+        border-radius: 6px !important; 
+        font-size: 13px !important;
+        font-weight: 600 !important;
+        padding: 0px 5px !important;
+        border: 1px solid #e0e0e0 !important;
+        background-color: white !important;
+        color: #555 !important;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.05) !important;
+    }
     
-    /* 버튼 색상 */
-    div[data-testid="stHorizontalBlock"] > div:nth-child(3) button { background-color: #e3f2fd !important; color: #1565c0 !important; border: 1px solid #90caf9 !important; }
-    div[data-testid="stHorizontalBlock"] > div:nth-child(4) button { background-color: #e8f5e9 !important; color: #2e7d32 !important; border: 1px solid #a5d6a7 !important; }
+    .stButton > button:hover, .stLinkButton > a:hover {
+        border-color: #007bff !important;
+        color: #007bff !important;
+        background-color: #f0f7ff !important;
+    }
+    
+    /* 간격 조정 */
+    hr { margin: 8px 0 !important; }
+    
+    /* 공사/유관 버튼 색상 포인트 */
+    div[data-testid="stHorizontalBlock"] .stButton:nth-of-type(2) button { color: #0056b3 !important; } /* 공사 */
+    div[data-testid="stHorizontalBlock"] .stButton:nth-of-type(3) button { color: #198754 !important; } /* 유관 */
+    
     </style>
     """, unsafe_allow_html=True)
 
@@ -238,7 +238,6 @@ if final_output:
                     font-size: 14px;
                 }}
                 .copy-btn:hover {{ border-color: #007bff; color: #007bff; background-color: #e7f3ff; }}
-                .copy-btn:active {{ background-color: #cbe4ff; }}
             </style>
         </head>
         <body>
@@ -252,7 +251,7 @@ if final_output:
                     try {{
                         var successful = document.execCommand('copy');
                         if (successful) alert('✅ 복사되었습니다!');
-                        else alert('❌ 복사 실패. 수동으로 복사해주세요.');
+                        else alert('❌ 복사 실패.');
                     }} catch (err) {{
                         alert('❌ 브라우저 차단됨.');
                     }}
@@ -310,32 +309,41 @@ def display_list(title, items, key_prefix):
         is_scraped = (item_txt in st.session_state.corp_list) or (item_txt in st.session_state.rel_list)
         bg = "bg-scraped" if is_scraped else "bg-white"
 
-        with st.container():
-            # [수정] 레이아웃 간격 조정 (여백 확보를 위해 컬럼 비율 조정 및 카드 마진 적용)
-            c1, c2, c3, c4 = st.columns([0.70, 0.10, 0.10, 0.10])
-            with c1:
-                st.markdown(f'''<div class="news-card {bg}">
-                    <div class="news-title">{res["title"]}</div>
-                    <div class="news-meta">
-                        <span style="color: #007bff; font-weight: bold;">{date_val}</span>
-                        [{res["press"]}] {"(스크랩됨)" if is_scraped else ""}
-                    </div>
-                </div>''', unsafe_allow_html=True)
-            with c2: st.link_button("원문", res['link'])
+        # [레이아웃 변경] 
+        # 왼쪽 큰 덩어리(뉴스) vs 오른쪽 작은 덩어리(버튼그룹)
+        # 비율을 7.5 : 2.5 로 설정하여 버튼들이 오른쪽 끝으로 붙게 함
+        main_cols = st.columns([0.75, 0.25], gap="small")
+        
+        # 1. 왼쪽: 뉴스 카드 영역
+        with main_cols[0]:
+            st.markdown(f'''<div class="news-card {bg}">
+                <div class="news-title">{res["title"]}</div>
+                <div class="news-meta">
+                    <span style="color: #007bff; font-weight: bold;">{date_val}</span>
+                    [{res["press"]}] {"(스크랩됨)" if is_scraped else ""}
+                </div>
+            </div>''', unsafe_allow_html=True)
+
+        # 2. 오른쪽: 버튼 영역 (내부에서 다시 3등분하여 옹기종기 모음)
+        with main_cols[1]:
+            # gap="small"로 버튼 사이 간격 좁힘
+            btn_cols = st.columns(3, gap="small") 
             
-            with c3:
-                if st.button("공사", key=f"c_{key_prefix}_{i}"):
+            with btn_cols[0]:
+                st.link_button("원문", res['link'], use_container_width=True)
+            with btn_cols[1]:
+                if st.button("공사", key=f"c_{key_prefix}_{i}", use_container_width=True):
                     if item_txt not in st.session_state.corp_list:
                         st.session_state.corp_list.append(item_txt)
-                        st.toast("🏢 추가되었습니다!"); time.sleep(1.0); st.rerun()
-            with c4:
-                if st.button("유관", key=f"r_{key_prefix}_{i}"):
+                        st.toast("🏢 추가됨!", icon="✅"); time.sleep(1.0); st.rerun()
+            with btn_cols[2]:
+                if st.button("유관", key=f"r_{key_prefix}_{i}", use_container_width=True):
                     if item_txt not in st.session_state.rel_list:
                         st.session_state.rel_list.append(item_txt)
-                        st.toast("🚆 추가되었습니다!"); time.sleep(1.0); st.rerun()
+                        st.toast("🚆 추가됨!", icon="✅"); time.sleep(1.0); st.rerun()
         
-        # [수정] 리스트 아이템 간의 간격을 좀 더 벌림
-        st.markdown("<div style='height: 15px;'></div>", unsafe_allow_html=True)
+        # 구분선
+        st.markdown("<div style='margin-bottom: 6px;'></div>", unsafe_allow_html=True)
 
 if st.session_state.search_results:
     naver_news = [x for x in st.session_state.search_results if x.get('is_naver')]
