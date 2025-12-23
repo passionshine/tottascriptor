@@ -84,8 +84,8 @@ st.markdown("""
     /* 버튼 스타일 (기본 및 색상) */
     .stButton > button, .stLinkButton > a {
         width: 100% !important; height: 38px !important;
-        font-size: 11px !important; font-weight: 800 !important;
-        padding: 0px !important; border-radius: 4px !important;
+        font-size: 9px !important; font-weight: 800 !important;
+        padding: 2px !important; border-radius: 4px !important;
     }
     div[data-testid="column"]:nth-of-type(3) button { background-color: #D1E9FF !important; color: #004085 !important; border: 1px solid #B8DAFF !important; }
     div[data-testid="column"]:nth-of-type(4) button { background-color: #E2F0D9 !important; color: #385723 !important; border: 1px solid #C5E0B4 !important; }
@@ -94,8 +94,8 @@ st.markdown("""
     .news-card { padding: 10px; border-radius: 8px; border-left: 5px solid #007bff; box-shadow: 0 1px 2px rgba(0,0,0,0.1); width: 100%; }
     .bg-white { background: white !important; }
     .bg-scraped { background: #F0F2F6 !important; border-left: 5px solid #999 !important; opacity: 0.8; }
-    .news-title { font-size: 13px !important; font-weight: 700; color: #111; line-height: 1.3; }
-    .news-meta { font-size: 9px !important; color: #666; margin-top: 2px; }
+    .news-title { font-size: 15px !important; font-weight: 700; color: #111; line-height: 1.3; }
+    .news-meta { font-size: 13px !important; color: #666; margin-top: 2px; }
 
     /* 개별 삭제 버튼 전용 스타일 */
     .del-btn button { background-color: #ffebee !important; color: #c62828 !important; border: none !important; height: 25px !important; }
