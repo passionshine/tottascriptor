@@ -160,7 +160,7 @@ st.markdown("""
     .stButton > button, .stLinkButton > a { 
         width: 100% !important; 
         height: 38px !important; 
-        font-size: 13px !important; 
+        font-size: 11px !important; 
         font-weight: 600 !important;
         padding: 0 !important;
         display: flex; align-items: center; justify-content: center;
@@ -236,14 +236,14 @@ def display_list(title, items, key_p):
             with st.container(border=True):
                 b1, b2, b3 = st.columns(3, gap="small")
                 with b1: 
-                    st.link_button("원문", res['link'], use_container_width=True)
+                    st.link_button("원문보기", res['link'], use_container_width=True)
                 with b2:
-                    if st.button("공사", key=f"c_{key_p}_{i}", use_container_width=True):
+                    if st.button("공사보도", key=f"c_{key_p}_{i}", use_container_width=True):
                         if item_txt not in st.session_state.corp_list:
                             st.session_state.corp_list.append(item_txt)
                             st.toast("🏢 공사 스크랩!", icon="✅"); time.sleep(0.5); st.rerun()
                 with b3:
-                    if st.button("기타", key=f"r_{key_p}_{i}", use_container_width=True):
+                    if st.button("기타기사", key=f"r_{key_p}_{i}", use_container_width=True):
                         if item_txt not in st.session_state.rel_list:
                             st.session_state.rel_list.append(item_txt)
                             st.toast("🚆 유관 스크랩!", icon="✅"); time.sleep(0.5); st.rerun()
@@ -258,3 +258,4 @@ if st.session_state.search_results:
     if p_news: display_list("📰 지면 보도", p_news, "p")
     if n_news: display_list("🟢 네이버 뉴스", n_news, "n")
     if o_news: display_list("🌐 기타 뉴스", o_news, "o")
+
