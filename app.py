@@ -330,17 +330,17 @@ def display_list(title, items, key_prefix):
             btn_cols = st.columns(3, gap="small") 
             
             with btn_cols[0]:
-                st.link_button("원문", res['link'], use_container_width=True)
+                st.link_button("원문보기", res['link'], use_container_width=True)
             with btn_cols[1]:
-                if st.button("공사", key=f"c_{key_prefix}_{i}", use_container_width=True):
+                if st.button("공사기사", key=f"c_{key_prefix}_{i}", use_container_width=True):
                     if item_txt not in st.session_state.corp_list:
                         st.session_state.corp_list.append(item_txt)
-                        st.toast("🏢 추가됨!", icon="✅"); time.sleep(1.0); st.rerun()
+                        st.toast("🏢 공사 관련 보도에 추가됨!", icon="✅"); time.sleep(1.0); st.rerun()
             with btn_cols[2]:
-                if st.button("유관", key=f"r_{key_prefix}_{i}", use_container_width=True):
+                if st.button("기타기사", key=f"r_{key_prefix}_{i}", use_container_width=True):
                     if item_txt not in st.session_state.rel_list:
                         st.session_state.rel_list.append(item_txt)
-                        st.toast("🚆 추가됨!", icon="✅"); time.sleep(1.0); st.rerun()
+                        st.toast("🚆 유관기관 기타 보도에 추가됨!", icon="✅"); time.sleep(1.0); st.rerun()
         
         # 구분선
         st.markdown("<div style='margin-bottom: 6px;'></div>", unsafe_allow_html=True)
@@ -352,3 +352,4 @@ if st.session_state.search_results:
     display_list("🟢 네이버 뉴스", naver_news, "n")
     st.write("")
     display_list("🌐 언론사 자체 기사", other_news, "o")
+
