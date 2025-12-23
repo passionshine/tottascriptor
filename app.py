@@ -75,7 +75,7 @@ st.markdown("""
     /* 수평 간격 제거 및 가로 배치 강제 */
     [data-testid="stHorizontalBlock"] { gap: 0rem !important; }
     div[data-testid="column"] {
-        padding: 0px 1px !important;
+        padding: 3px 1px !important;
         flex-direction: row !important;
         align-items: center !important;
         min-width: 0px !important;
