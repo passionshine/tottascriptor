@@ -42,6 +42,11 @@ class NewsScraper:
         
         query = f'"{keyword}"'
         max_pages = (max_articles // 10) + 1
+
+        # 진행상황 표시
+        progress_bar = st.progress(0)
+        status_text = st.empty()
+
         
         # 로그 및 상태창
         log_container = st.container()
@@ -256,3 +261,4 @@ if st.session_state.search_results:
     display_list("🟢 네이버 뉴스", naver_news, "n")
     st.write("")
     display_list("🌐 언론사 자체 기사", other_news, "o")
+
