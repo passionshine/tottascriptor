@@ -7,6 +7,8 @@ import re
 import streamlit.components.v1 as components
 import json
 import os
+import smtplib
+from email.mime.text import MIMEText
 
 # ==============================================================================
 # [0] 사용량 카운트 관리
@@ -52,7 +54,30 @@ def get_target_date():
     return target
 
 # ==============================================================================
-# [2] 뉴스 스크래퍼
+# [2] 이메일 발송 함수 (Gmail 전용)
+# ==============================================================================
+def send_email_gmail(sender_email, sender_pw, receiver_email, subject, content):
+    try:
+        msg = MIMEText(content, _charset="utf-8")
+        msg['Subject'] = subject
+        msg['From'] = sender_email
+        msg['To'] = receiver_email
+
+        # 구글 SMTP 서버 연결 (587 포트 / TLS)
+        smtp = smtplib.SMTP("smtp.gmail.com", 587)
+        smtp.ehlo()
+        smtp.starttls()  # 보안 연결
+        
+        # 로그인 및 전송
+        smtp.login(sender_email, sender_pw)
+        smtp.sendmail(sender_email, receiver_email, msg.as_string())
+        smtp.quit()
+        return True, "✅ 메일 전송 성공!"
+    except Exception as e:
+        return False, f"❌ 전송 실패: {e}"
+
+# ==============================================================================
+# [3] 뉴스 스크래퍼
 # ==============================================================================
 class NewsScraper:
     def __init__(self):
@@ -155,7 +180,7 @@ class NewsScraper:
         return all_results
 
 # ==============================================================================
-# [3] UI 설정 및 CSS 스타일링 (충돌 해결 버전)
+# [4] UI 설정 및 CSS 스타일링
 # ==============================================================================
 st.set_page_config(page_title="Totta Scriptor for web", layout="wide")
 
@@ -257,7 +282,7 @@ for key in ['corp_list', 'rel_list', 'search_results']:
     if key not in st.session_state: st.session_state[key] = []
 
 # ==============================================================================
-# [4] 메인 UI
+# [5] 메인 UI
 # ==============================================================================
 c1, c2 = st.columns([0.8, 0.2])
 with c1: st.title("🚇 Totta Scriptor for web")
@@ -323,10 +348,44 @@ with st.container(border=True):
 text_height = max(150, (final_output.count('\n') + 1) * 22)
 st.text_area("스크랩 결과", value=final_output, height=text_height, label_visibility="collapsed")
 
+# --- [이메일 전송 섹션 (st.secrets 연동)] ---
+st.divider()
+with st.expander("📧 구글 메일로 결과 보내기", expanded=False):
+    # Streamlit Cloud의 secrets에서 값 가져오기 (없으면 빈칸 처리)
+    try:
+        default_id = st.secrets["gmail"]["id"]
+        default_pw = st.secrets["gmail"]["pw"]
+    except:
+        default_id = ""
+        default_pw = ""
+
+    c1, c2 = st.columns([1, 1])
+    with c1:
+        # secrets 값이 있으면 자동으로 채워짐
+        sender_id = st.text_input("보내는 구글 메일", value=default_id, placeholder="example@gmail.com")
+        sender_pw = st.text_input("구글 앱 비밀번호", value=default_pw, type="password")
+    with c2:
+        receiver_id = st.text_input("받는 사람 이메일", placeholder="boss@company.com")
+        mail_title = st.text_input("메일 제목", value=f"[{t_date.month}/{t_date.day}] 뉴스 스크랩 보고")
+
+    if st.button("📩 메일 전송하기", use_container_width=True):
+        if not sender_id or not sender_pw or not receiver_id:
+            st.error("이메일 정보와 앱 비밀번호를 입력해주세요.")
+        elif not final_output.strip():
+            st.warning("보낼 내용이 없습니다.")
+        else:
+            with st.spinner("메일 전송 중..."):
+                success, msg = send_email_gmail(sender_id, sender_pw, receiver_id, mail_title, final_output)
+                if success:
+                    st.success(msg)
+                    st.balloons()
+                else:
+                    st.error(msg)
+
 st.divider()
 
 # ==============================================================================
-# [5] 검색 설정
+# [6] 검색 설정
 # ==============================================================================
 with st.expander("🔍 뉴스 검색 설정", expanded=True):
     col1, col2, col3 = st.columns([2, 1, 1])
@@ -341,7 +400,7 @@ with st.expander("🔍 뉴스 검색 설정", expanded=True):
         st.rerun()
 
 # ==============================================================================
-# [6] 리스트 출력 함수
+# [7] 리스트 출력 함수
 # ==============================================================================
 def display_list(title, items, key_p):
     st.markdown(f'<div class="section-header">{title} ({len(items)}건)</div>', unsafe_allow_html=True)
@@ -391,6 +450,3 @@ if st.session_state.search_results:
     if p_news: display_list("📰 지면 보도", p_news, "p")
     if n_news: display_list("🟢 네이버 뉴스", n_news, "n")
     if o_news: display_list("🌐 언론사 자체 뉴스", o_news, "o")
-
-
-
