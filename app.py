@@ -379,4 +379,160 @@ def email_dialog(content):
     
     with r_c1:
         receiver_user = st.text_input("받는사람ID", placeholder="userid", label_visibility="collapsed")
-    with r_
+    with r_c2:
+        st.markdown("<div style='text-align:center; padding-top:10px; font-weight:bold;'>@</div>", unsafe_allow_html=True)
+    with r_c3:
+        domains = ["seoulmetro.co.kr", "naver.com", "gmail.com", "daum.net", "google.com", "직접입력"]
+        selected_domain = st.selectbox("도메인선택", domains, label_visibility="collapsed")
+
+    if selected_domain == "직접입력":
+        custom_domain = st.text_input("도메인 직접 입력", placeholder="company.com")
+        if receiver_user and custom_domain:
+            receiver_id = f"{receiver_user}@{custom_domain}"
+        else:
+            receiver_id = ""
+    else:
+        if receiver_user:
+            receiver_id = f"{receiver_user}@{selected_domain}"
+        else:
+            receiver_id = ""
+
+    # 3. 메일 제목
+    st.markdown("**메일 제목**")
+    mail_title = st.text_input("메일 제목", value=f"[{t_date.month}/{t_date.day}] 뉴스 스크랩 보고", label_visibility="collapsed")
+    
+    st.markdown("") 
+
+    if st.button("🚀 전송하기", use_container_width=True, type="primary"):
+        if not sender_id or not sender_pw or not receiver_id:
+            st.error("이메일 정보를 모두 입력해주세요.")
+        elif not content.strip():
+            st.warning("보낼 내용이 없습니다.")
+        else:
+            with st.spinner("전송 중..."):
+                success, msg = send_email_gmail(sender_id, sender_pw, receiver_id, mail_title, content)
+                if success:
+                    st.success(msg)
+                    time.sleep(1.5)
+                    st.rerun()
+                else:
+                    st.error(msg)
+
+# --------------------------------------------------------------------------
+# [TOOLBAR] 복사 / 메일 / 초기화 버튼
+# --------------------------------------------------------------------------
+with st.container(border=True):
+    cb1, cb2, cb3 = st.columns(3)
+    
+    with cb1:
+        if final_output.strip() != date_header.strip():
+            js_code = f"""
+            <style>
+                body {{ margin: 0; padding: 0; overflow: hidden; }}
+                .custom-btn {{
+                    width: 100%; height: 38px; background-color: white; color: #31333F;
+                    border: 1px solid #e0e0e0; border-radius: 4px; cursor: pointer;
+                    font-size: 13px; font-weight: 600; font-family: "Source Sans Pro", sans-serif;
+                    display: flex; align-items: center; justify-content: center;
+                    box-sizing: border-box; transition: all 0.2s ease;
+                }}
+                .custom-btn:hover {{ border-color: #007bff; color: #007bff; outline: none; }}
+                .custom-btn:active {{ background-color: #f0f7ff; }}
+            </style>
+            <textarea id="copy_target" style="position:absolute;top:-9999px;">{final_output}</textarea>
+            <button class="custom-btn" onclick="copyToClipboard()">📋 텍스트 복사</button>
+            <script>
+                function copyToClipboard() {{
+                    var t = document.getElementById("copy_target");
+                    t.select(); document.execCommand("copy"); alert("✅ 복사되었습니다!");
+                }}
+            </script>
+            """
+            components.html(js_code, height=38)
+        else:
+            st.button("📋 텍스트 복사", disabled=True, use_container_width=True)
+
+    with cb2:
+        if st.button("📧 메일 보내기", use_container_width=True):
+            email_dialog(final_output)
+
+    with cb3:
+        if st.button("🗑️ 전체 초기화", use_container_width=True):
+            st.session_state.corp_list, st.session_state.rel_list = [], []
+            st.rerun()
+
+text_height = max(150, (final_output.count('\n') + 1) * 22)
+st.text_area("스크랩 결과", value=final_output, height=text_height, label_visibility="collapsed")
+
+st.divider()
+
+# ==============================================================================
+# [8] 검색 설정
+# ==============================================================================
+with st.expander("🔍 뉴스 검색 설정", expanded=True):
+    col1, col2, col3 = st.columns([2, 1, 1])
+    with col1: kw = st.text_input("검색어", value="서울교통공사")
+    with col2: sd = st.date_input("시작", datetime.date.today() - datetime.timedelta(days=1))
+    with col3: ed = st.date_input("종료", datetime.date.today())
+    mx = st.slider("최대 기사 수", 10, 100, 30)
+    
+    if st.button("🚀 뉴스 검색 시작", type="primary", use_container_width=True):
+        # 1. 뉴스 검색
+        results = NewsScraper().fetch_news(sd, ed, kw, mx)
+        st.session_state.search_results = results
+        
+        # 2. 구글 시트에 로그 기록
+        log_to_gsheets(kw, len(results))
+        
+        st.rerun()
+
+# ==============================================================================
+# [9] 리스트 출력 함수
+# ==============================================================================
+def display_list(title, items, key_p):
+    st.markdown(f'<div class="section-header">{title} ({len(items)}건)</div>', unsafe_allow_html=True)
+    
+    for i, res in enumerate(items):
+        d_val = res.get('date', '')
+        item_txt = f"ㅇ {res['title']}_{res['press']}\n{res['link']}\n\n"
+        
+        is_scraped = (item_txt in st.session_state.corp_list) or (item_txt in st.session_state.rel_list)
+        bg = "bg-scraped" if is_scraped else ""
+
+        col_m, col_b = st.columns([0.65, 0.35])
+        
+        with col_m:
+            st.markdown(f"""<div class="news-card {bg}">
+                <div class="news-title">{res['title']}</div>
+                <div class="news-meta"><span style="color:#007bff;font-weight:bold;">{d_val}</span> | {res['press']}</div>
+            </div>""", unsafe_allow_html=True)
+        
+        with col_b:
+            b1, b2, b3 = st.columns(3, gap="small")
+            
+            with b1: # 1번: 원문
+                st.link_button("원문보기", res['link'], use_container_width=True)
+            with b2: # 2번: 공사
+                if st.button("공사보도", key=f"c_{key_p}_{i}", use_container_width=True):
+                    if item_txt not in st.session_state.corp_list:
+                        st.session_state.corp_list.append(item_txt)
+                        st.toast("🏢 공사 관련 스크랩 완료!", icon="✅"); time.sleep(0.5); st.rerun()
+                    else:
+                        st.toast("⚠️ 이미 추가된 기사입니다", icon="❗")
+            with b3: # 3번: 기타
+                if st.button("기타보도", key=f"r_{key_p}_{i}", use_container_width=True):
+                    if item_txt not in st.session_state.rel_list:
+                        st.session_state.rel_list.append(item_txt)
+                        st.toast("🚆 유관기관 기타 스크랩 완료!", icon="✅"); time.sleep(0.5); st.rerun()
+                    else:
+                        st.toast("⚠️ 이미 추가된 기사입니다.", icon="❗")
+
+if st.session_state.search_results:
+    res = st.session_state.search_results
+    p_news = [x for x in res if x['is_paper']]
+    n_news = [x for x in res if x['is_naver'] and not x['is_paper']]
+    o_news = [x for x in res if not x['is_naver'] and not x['is_paper']]
+    
+    if p_news: display_list("📰 지면 보도", p_news, "p")
+    if n_news: display_list("🟢 네이버 뉴스", n_news, "n")
+    if o_news: display_list("🌐 언론사 자체 뉴스", o_news, "o")
