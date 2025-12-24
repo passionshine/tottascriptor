@@ -9,12 +9,11 @@ import json
 import os
 
 # ==============================================================================
-# [0] 사용량 카운트 관리 (파일 입출력)
+# [0] 사용량 카운트 관리
 # ==============================================================================
 USAGE_FILE = "usage_log.json"
 
 def get_usage_count():
-    """파일에서 현재 누적 사용 횟수를 읽어옵니다."""
     if not os.path.exists(USAGE_FILE):
         return 0
     try:
@@ -25,7 +24,6 @@ def get_usage_count():
         return 0
 
 def increment_usage_count():
-    """사용 횟수를 1 증가시키고 파일에 저장합니다."""
     current_count = get_usage_count()
     new_count = current_count + 1
     with open(USAGE_FILE, "w", encoding="utf-8") as f:
@@ -33,16 +31,14 @@ def increment_usage_count():
     return new_count
 
 # ==============================================================================
-# [1] 스마트 날짜 계산 (공휴일 반영)
+# [1] 스마트 날짜 계산
 # ==============================================================================
 def get_target_date():
     today = datetime.date.today()
-    # 금요일 -> 월요일(3일 뒤), 토요일 -> 월요일(2일 뒤), 평일 -> 다음날
     if today.weekday() == 4: target = today + datetime.timedelta(days=3)
     elif today.weekday() == 5: target = today + datetime.timedelta(days=2)
     else: target = today + datetime.timedelta(days=1)
 
-    # 2026년까지의 주요 공휴일 (필요시 업데이트)
     holidays = [
         datetime.date(2026,1,1), datetime.date(2026,2,16), datetime.date(2026,2,17), datetime.date(2026,2,18),
         datetime.date(2026,3,1), datetime.date(2026,3,2), datetime.date(2026,5,5),
@@ -51,17 +47,15 @@ def get_target_date():
         datetime.date(2026,10,3), datetime.date(2026,10,9), datetime.date(2026,12,25)
     ]
     
-    # 목표일이 주말(토,일)이거나 공휴일이면 다음 평일로 이동
     while target in holidays or target.weekday() >= 5:
         target += datetime.timedelta(days=1)
     return target
 
 # ==============================================================================
-# [2] 뉴스 스크래퍼 (네이버 뉴스 검색)
+# [2] 뉴스 스크래퍼
 # ==============================================================================
 class NewsScraper:
     def __init__(self):
-        # 봇 탐지 우회를 위한 cloudscraper 사용
         self.scraper = cloudscraper.create_scraper()
         self.headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -69,7 +63,6 @@ class NewsScraper:
         }
 
     def fetch_news(self, start_d, end_d, keyword, max_articles):
-        # 네이버 검색 파라미터 설정
         ds, de = start_d.strftime("%Y.%m.%d"), end_d.strftime("%Y.%m.%d")
         nso = f"so:dd,p:from{start_d.strftime('%Y%m%d')}to{end_d.strftime('%Y%m%d')}"
         
@@ -85,7 +78,6 @@ class NewsScraper:
         for page in range(1, max_pages + 1):
             if len(all_results) >= max_articles: break
             
-            # 진행상황 업데이트
             progress_bar.progress(min(page / max_pages, 1.0))
             status_text.text(f"⏳ {page}/{max_pages}페이지 분석 중... (현재 {len(all_results)}건)")
             
@@ -97,7 +89,6 @@ class NewsScraper:
                 if response.status_code != 200: continue
 
                 soup = BeautifulSoup(response.content, 'html.parser')
-                # 뉴스 리스트 항목 추출 (두 가지 선택자 시도)
                 items = soup.select('a[data-heatmap-target=".tit"]') or soup.select('a.news_tit')
                 
                 if not items: break
@@ -108,7 +99,6 @@ class NewsScraper:
                     title = t_tag.get_text(strip=True)
                     original_link = t_tag.get('href')
                     
-                    # 뉴스 카드 영역 찾기 (상위 부모 요소 탐색)
                     card = None
                     curr = t_tag
                     for _ in range(5):
@@ -126,26 +116,22 @@ class NewsScraper:
                     is_paper = False
 
                     if card:
-                        # 네이버 뉴스 링크가 있으면 우선 사용
                         naver_btn = card.select_one('a[href*="n.news.naver.com"]')
                         if naver_btn:
                             final_link = naver_btn.get('href')
                             is_naver = True
                         
-                        # 언론사명 추출
                         press_el = card.select_one(".sds-comps-profile-info-title-text, .press_name, .info.press")
                         if press_el: press_name = press_el.get_text(strip=True)
                         
                         full_text = card.get_text(separator=" ", strip=True)
                         
-                        # 날짜 추출 (상대 시간 or 절대 날짜)
                         date_match = re.search(r'(\d+\s?(?:분|시간|일|주|초)\s?전|방금\s?전)', full_text)
                         abs_date_match = re.search(r'(\d{4}[\.\-]\d{2}[\.\-]\d{2})', full_text)
 
                         if date_match: article_date = date_match.group(1)
                         elif abs_date_match: article_date = abs_date_match.group(1).rstrip('.')
                         
-                        # 지면 정보 (A1면 등) 확인
                         if re.search(r'([A-Za-z]*\d+면)', full_text):
                             paper_info = " (지면)"
                             is_paper = True
@@ -161,7 +147,7 @@ class NewsScraper:
                         'is_paper': is_paper,
                         'date': article_date
                     })
-                time.sleep(0.3) # 차단 방지 딜레이
+                time.sleep(0.3)
             except: continue
         
         progress_bar.empty()
@@ -169,24 +155,24 @@ class NewsScraper:
         return all_results
 
 # ==============================================================================
-# [3] UI 설정 및 CSS 스타일링
+# [3] UI 설정 및 CSS 스타일링 (핵심 수정 부분)
 # ==============================================================================
 st.set_page_config(page_title="Totta Scriptor for web", layout="wide")
 
 st.markdown("""
     <style>
-    /* 1. 뉴스 카드 스타일 (연한 하늘색 배경) */
+    /* 1. 뉴스 카드 스타일 */
     .news-card { 
         padding: 12px 16px; border-radius: 8px; border-left: 5px solid #007bff; 
         box-shadow: 0 2px 4px rgba(0,0,0,0.08); 
-        background: #f0f8ff; 
+        background: #f0f8ff; /* 연한 하늘색 */
         margin-bottom: 5px;
     }
     .bg-scraped { background: #e9ecef !important; border-left: 5px solid #adb5bd !important; opacity: 0.8; }
     .news-title { font-size: 15px !important; font-weight: 700; color: #222; margin-bottom: 5px; line-height: 1.4; }
     .news-meta { font-size: 12px !important; color: #666; }
     
-    /* 2. 기본 버튼 스타일 (공통) */
+    /* 2. 전체 버튼 기본 리셋 (크기 및 폰트 통일) */
     .stButton > button, .stLinkButton > a, .stButton > button p, .stLinkButton > a p { 
         width: 100% !important; height: 38px !important; 
         font-size: 13px !important; font-weight: 600 !important; 
@@ -194,38 +180,48 @@ st.markdown("""
         border-radius: 4px !important; transition: all 0.2s ease !important;
         background-color: white !important; color: #31333F !important;
     }
-    
-    /* 호버링 효과 (공통 파란색) */
-    .stButton > button:hover, .stLinkButton > a:hover {
+
+    /* 3. [상단 툴바] 복사/초기화 버튼 스타일 동기화 */
+    /* 초기화 버튼(cb2)이 있는 툴바 박스 내부의 버튼만 타겟팅 */
+    div[data-testid="stVerticalBlockBorderWrapper"] .stButton > button {
+        border: 1px solid #e0e0e0 !important; /* 복사 버튼과 동일한 테두리 색 */
+        box-shadow: none !important;
+    }
+    /* 툴바 초기화 버튼 호버링 -> 파란색 */
+    div[data-testid="stVerticalBlockBorderWrapper"] .stButton > button:hover {
+        border-color: #007bff !important;
         color: #007bff !important;
     }
 
-    /* ▼▼▼ [버튼 위치별 개별 스타일링] ▼▼▼ */
+    /* 4. [뉴스 리스트] 버튼 3개 개별 호버링 스타일 */
     /* 1번: 원문보기 (테두리 없음) */
     div[data-testid="column"]:nth-of-type(1) a {
         border: none !important; background-color: transparent !important; color: #666 !important;
     }
     div[data-testid="column"]:nth-of-type(1) a:hover {
-        text-decoration: underline; color: #007bff !important;
+        text-decoration: underline; color: #007bff !important; /* 밑줄 + 파란글씨 */
     }
 
-    /* 2번: 공사 기사 (테두리 있음, 강조) */
+    /* 2번: 공사 기사 (테두리 있음, 메인) */
     div[data-testid="column"]:nth-of-type(2) button {
         border: 1px solid #e0e0e0 !important; color: #007bff !important;
     }
     div[data-testid="column"]:nth-of-type(2) button:hover {
-        border-color: #007bff !important; background-color: #f0f8ff !important;
+        border-color: #007bff !important; 
+        background-color: #f0f8ff !important; /* 연한 하늘색 배경 */
+        color: #007bff !important;
     }
 
-    /* 3번: 기타 기사 (테두리 없음) */
+    /* 3번: 기타 기사 (테두리 없음, 서브) */
     div[data-testid="column"]:nth-of-type(3) button {
         border: none !important; background-color: transparent !important; color: #888 !important;
     }
     div[data-testid="column"]:nth-of-type(3) button:hover {
-        color: #555 !important; background-color: #f1f3f5 !important;
+        color: #333 !important; /* 진한 회색 글씨 */
+        background-color: #f1f3f5 !important; /* 연한 회색 배경 */
     }
 
-    /* 3. 툴바(둥근 박스) 다이어트 및 결과창 밀착 */
+    /* 5. 툴바 박스 다이어트 */
     div[data-testid="stVerticalBlockBorderWrapper"] { 
         padding: 5px !important; margin-bottom: -10px !important; 
     }
@@ -241,42 +237,46 @@ for key in ['corp_list', 'rel_list', 'search_results']:
     if key not in st.session_state: st.session_state[key] = []
 
 # ==============================================================================
-# [4] 메인 UI 구성
+# [4] 메인 UI
 # ==============================================================================
-# 타이틀 & 사용량 표시
 c1, c2 = st.columns([0.8, 0.2])
 with c1: st.title("🚇 Totta Scriptor for web")
 with c2:
     current_usage = get_usage_count()
     st.markdown(f"<div style='text-align:right; font-size:14px; color:#888; margin-top:20px;'>🔢 누적 실행: <b>{current_usage}</b>회</div>", unsafe_allow_html=True)
 
-# 날짜 및 제목 생성
+# 날짜 헤더 생성
 t_date = get_target_date()
 weekdays = ["월", "화", "수", "목", "금", "토", "일"]
 w_str = weekdays[t_date.weekday()]
 date_header = f"<{t_date.month}월 {t_date.day}일({w_str}) 조간 스크랩>"
 
-# 최종 텍스트 조합
 final_output = f"{date_header}\n\n[공사 관련 보도]\n" + "".join(st.session_state.corp_list) + "\n[유관기관 관련 보도]\n" + "".join(st.session_state.rel_list)
 
-# --- [툴바] 복사 및 초기화 버튼 ---
+# --- [상단 툴바] 복사 & 초기화 ---
 with st.container(border=True):
     cb1, cb2 = st.columns(2)
     
-    # 1. 텍스트 복사 버튼 (커스텀 HTML/JS)
+    # 1. 복사 버튼 (HTML/JS)
     with cb1:
         if final_output.strip() != date_header.strip():
-            # 버튼 CSS (순정 버튼과 유사하게, 호버는 파란색)
+            # 초기화 버튼(cb2) 스타일과 100% 일치시키는 CSS
             js_code = f"""
             <style>
                 body {{ margin: 0; padding: 0; overflow: hidden; }}
                 .custom-btn {{
-                    width: 100%; height: 38px; background-color: white; color: #31333F;
-                    border: 1px solid #e0e0e0; border-radius: 4px; cursor: pointer;
-                    font-size: 14px; font-weight: 400; font-family: "Source Sans Pro", sans-serif;
+                    width: 100%; height: 38px; 
+                    background-color: white; color: #31333F;
+                    border: 1px solid #e0e0e0; /* 테두리 색상 통일 */
+                    border-radius: 4px; 
+                    cursor: pointer;
+                    font-size: 13px; font-weight: 600; /* 폰트 통일 */
+                    font-family: "Source Sans Pro", sans-serif;
                     display: flex; align-items: center; justify-content: center;
-                    box-sizing: border-box; transition: all 0.2s ease;
+                    box-sizing: border-box; 
+                    transition: all 0.2s ease;
                 }}
+                /* 호버링: 파란색 (#007bff) */
                 .custom-btn:hover {{ border-color: #007bff; color: #007bff; outline: none; }}
                 .custom-btn:active {{ background-color: #f0f7ff; }}
             </style>
@@ -293,20 +293,19 @@ with st.container(border=True):
         else:
             st.button("📋 텍스트 복사", disabled=True, use_container_width=True)
 
-    # 2. 초기화 버튼 (순정 버튼)
+    # 2. 초기화 버튼 (Streamlit Native)
     with cb2:
         if st.button("🗑️ 전체 초기화", use_container_width=True):
             st.session_state.corp_list, st.session_state.rel_list = [], []
             st.rerun()
 
-# 결과 텍스트 출력창
 text_height = max(150, (final_output.count('\n') + 1) * 22)
 st.text_area("스크랩 결과", value=final_output, height=text_height, label_visibility="collapsed")
 
 st.divider()
 
 # ==============================================================================
-# [5] 검색 설정 및 실행
+# [5] 검색 설정
 # ==============================================================================
 with st.expander("🔍 뉴스 검색 설정", expanded=True):
     col1, col2, col3 = st.columns([2, 1, 1])
@@ -321,20 +320,18 @@ with st.expander("🔍 뉴스 검색 설정", expanded=True):
         st.rerun()
 
 # ==============================================================================
-# [6] 뉴스 리스트 출력 함수
+# [6] 리스트 출력 함수 (개별 스타일 적용됨)
 # ==============================================================================
 def display_list(title, items, key_p):
     st.markdown(f'<div class="section-header">{title} ({len(items)}건)</div>', unsafe_allow_html=True)
     
     for i, res in enumerate(items):
         d_val = res.get('date', '')
-        # 결과 텍스트에는 날짜 제외
         item_txt = f"ㅇ {res['title']}_{res['press']}\n{res['link']}\n\n"
         
         is_scraped = (item_txt in st.session_state.corp_list) or (item_txt in st.session_state.rel_list)
         bg = "bg-scraped" if is_scraped else ""
 
-        # 왼쪽: 뉴스 카드, 오른쪽: 버튼 영역
         col_m, col_b = st.columns([0.65, 0.35])
         
         with col_m:
@@ -344,19 +341,18 @@ def display_list(title, items, key_p):
             </div>""", unsafe_allow_html=True)
         
         with col_b:
-            # 버튼 영역 (CSS nth-of-type으로 개별 스타일 적용됨)
             b1, b2, b3 = st.columns(3, gap="small")
             
-            with b1: # 테두리 X (링크)
+            with b1: # 테두리 없음, 밑줄 호버
                 st.link_button("원문", res['link'], use_container_width=True)
-            with b2: # 테두리 O (강조)
+            with b2: # 파란 테두리, 파란 배경 호버
                 if st.button("공사", key=f"c_{key_p}_{i}", use_container_width=True):
                     if item_txt not in st.session_state.corp_list:
                         st.session_state.corp_list.append(item_txt)
                         st.toast("🏢 공사 스크랩!", icon="✅"); time.sleep(0.5); st.rerun()
                     else:
                         st.toast("⚠️ 이미 있음", icon="❗")
-            with b3: # 테두리 X (기타)
+            with b3: # 테두리 없음, 회색 배경 호버
                 if st.button("기타", key=f"r_{key_p}_{i}", use_container_width=True):
                     if item_txt not in st.session_state.rel_list:
                         st.session_state.rel_list.append(item_txt)
@@ -364,7 +360,6 @@ def display_list(title, items, key_p):
                     else:
                         st.toast("⚠️ 이미 있음", icon="❗")
 
-# 분류 및 최종 출력
 if st.session_state.search_results:
     res = st.session_state.search_results
     p_news = [x for x in res if x['is_paper']]
