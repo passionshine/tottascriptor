@@ -203,7 +203,7 @@ def send_email_gmail(sender_email, sender_pw, receiver_email, subject, content):
         return False, f"❌ 전송 실패: {e}"
 
 # ==============================================================================
-# [5] 뉴스 스크래퍼 (제목+언론사 중복 제거 기능 추가)
+# [5] 뉴스 스크래퍼
 # ==============================================================================
 class NewsScraper:
     def __init__(self):
@@ -248,7 +248,7 @@ class NewsScraper:
         
         all_results = []
         seen_links = set()
-        seen_title_press = set() # [NEW] 제목+언론사 중복 체크용
+        seen_title_press = set()
         
         status_text = st.empty()
         progress_bar = st.progress(0)
@@ -328,7 +328,6 @@ class NewsScraper:
                         if not include_others and not is_naver and not is_paper:
                             continue
 
-                        # [NEW] 제목+언론사 중복 체크 (띄어쓰기 없이 비교)
                         unique_key = (title.replace(" ", ""), press_name.replace(" ", ""))
                         
                         if final_link in seen_links or unique_key in seen_title_press: 
@@ -361,24 +360,55 @@ class NewsScraper:
         return all_results[:max_articles]
 
 # ==============================================================================
-# [6] UI 설정 및 CSS 스타일링
+# [6] UI 설정 및 CSS 스타일링 (카드 스타일 업데이트됨)
 # ==============================================================================
 st.markdown("""
     <style>
+    /* 기본 뉴스 카드 (Base) */
     .news-card { 
-        padding: 12px 16px; border-radius: 8px; border-left: 5px solid #007bff; 
+        padding: 12px 16px; border-radius: 8px; 
         box-shadow: 0 2px 4px rgba(0,0,0,0.08); 
-        background: #f0f8ff; 
         margin-bottom: 15px;
     }
-    .bg-scraped { background: #e9ecef !important; border-left: 5px solid #adb5bd !important; opacity: 0.8; }
+
+    /* 1. 네이버 뉴스 (연한 초록) */
+    .card-naver {
+        background: #e8f5e9 !important; 
+        border-left: 5px solid #2e7d32 !important;
+    }
+    
+    /* 2. 언론사 자체 기사 (연한 파랑) */
+    .card-outlink {
+        background: #f0f8ff !important; 
+        border-left: 5px solid #007bff !important;
+    }
+    
+    /* 3. 지면 기사 (검정 + 흰글씨) */
+    .card-paper {
+        background: #343a40 !important; 
+        border-left: 5px solid #212529 !important;
+    }
+    .card-paper .news-title { color: #ffffff !important; }
+    .card-paper .news-meta { color: #adb5bd !important; }
+
+    /* 이미 스크랩된 기사 (회색 처리 - 최우선 순위) */
+    .bg-scraped { 
+        background: #e9ecef !important; 
+        border-left: 5px solid #adb5bd !important; 
+        opacity: 0.6; 
+    }
+    .bg-scraped .news-title { color: #495057 !important; } /* 스크랩된건 다시 어두운 글씨로 */
+
+    /* 텍스트 스타일 */
     .news-title { font-size: 15px !important; font-weight: 700; color: #222; margin-bottom: 5px; line-height: 1.4; }
     .news-meta { font-size: 12px !important; color: #666; }
     
+    /* 뱃지 스타일 */
     .keyword-badge {
-        background-color: #e3f2fd; color: #1565c0; 
-        padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: 600;
-        margin-right: 6px; border: 1px solid #bbdefb;
+        background-color: rgba(255,255,255,0.7); 
+        color: #555; border: 1px solid #ccc;
+        padding: 1px 5px; border-radius: 4px; font-size: 11px; font-weight: 600;
+        margin-right: 6px;
     }
     
     .stButton > button, .stLinkButton > a, .stButton > button p, .stLinkButton > a p { 
@@ -603,7 +633,7 @@ with st.expander("🔍 뉴스 검색 설정", expanded=True):
             st.rerun()
 
 # ==============================================================================
-# [9] 리스트 출력 함수
+# [9] 리스트 출력 함수 (카드 스타일 클래스 적용됨)
 # ==============================================================================
 def display_list(title, items, key_p):
     st.markdown(f'<div class="section-header">{title} ({len(items)}건)</div>', unsafe_allow_html=True)
@@ -615,16 +645,26 @@ def display_list(title, items, key_p):
         item_txt = f"ㅇ {res['title']}_{res['press']}\n{res['link']}\n\n"
         
         is_scraped = (item_txt in st.session_state.corp_list) or (item_txt in st.session_state.rel_list)
-        bg = "bg-scraped" if is_scraped else ""
+        
+        # [NEW] 카드 스타일 결정 로직
+        if is_scraped:
+            card_class = "bg-scraped"
+        elif res['is_paper']:
+            card_class = "card-paper"
+        elif res['is_naver']:
+            card_class = "card-naver"
+        else:
+            card_class = "card-outlink"
 
         col_m, col_b = st.columns([0.65, 0.35])
         
         with col_m:
             badge_html = f"<span class='keyword-badge'>🔍 {src_kw}</span>" if src_kw else ""
             
-            st.markdown(f"""<div class="news-card {bg}">
+            # [수정] 클래스 변수(card_class) 적용
+            st.markdown(f"""<div class="news-card {card_class}">
                 <div class="news-title">{badge_html}{res['title']}</div>
-                <div class="news-meta"><span style="color:#007bff;font-weight:bold;">{d_val}</span> | {res['press']}</div>
+                <div class="news-meta"><span style="font-weight:bold;">{d_val}</span> | {res['press']}</div>
             </div>""", unsafe_allow_html=True)
         
         with col_b:
@@ -649,6 +689,9 @@ def display_list(title, items, key_p):
 
 if st.session_state.search_results:
     res = st.session_state.search_results
+    
+    # [수정] 카드 스타일 로직 변경으로 인해 굳이 그룹별로 리스트를 나눌 필요는 없으나,
+    # 헤더(지면/네이버/기타)를 구분해서 보여주는 현재 구조를 유지하는 것이 가독성에 좋습니다.
     p_news = [x for x in res if x['is_paper']]
     n_news = [x for x in res if x['is_naver'] and not x['is_paper']]
     o_news = [x for x in res if not x['is_naver'] and not x['is_paper']]
