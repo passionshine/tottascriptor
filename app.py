@@ -360,7 +360,7 @@ class NewsScraper:
         return all_results[:max_articles]
 
 # ==============================================================================
-# [6] UI 설정 및 CSS 스타일링 (카드 스타일 업데이트됨)
+# [6] UI 설정 및 CSS 스타일링
 # ==============================================================================
 st.markdown("""
     <style>
@@ -391,13 +391,13 @@ st.markdown("""
     .card-paper .news-title { color: #ffffff !important; }
     .card-paper .news-meta { color: #adb5bd !important; }
 
-    /* 이미 스크랩된 기사 (회색 처리 - 최우선 순위) */
+    /* 이미 스크랩된 기사 (회색 처리) */
     .bg-scraped { 
         background: #e9ecef !important; 
         border-left: 5px solid #adb5bd !important; 
         opacity: 0.6; 
     }
-    .bg-scraped .news-title { color: #495057 !important; } /* 스크랩된건 다시 어두운 글씨로 */
+    .bg-scraped .news-title { color: #495057 !important; }
 
     /* 텍스트 스타일 */
     .news-title { font-size: 15px !important; font-weight: 700; color: #222; margin-bottom: 5px; line-height: 1.4; }
@@ -472,11 +472,43 @@ c1, c2 = st.columns([0.8, 0.2])
 with c1: 
     st.title("🚇 Totta Scriptor for web")
 
+# [NEW] 도움말 다이얼로그 함수
+@st.dialog("📖 Totta Scriptor 사용 설명서")
+def help_dialog():
+    st.markdown("""
+    ### 1. 뉴스 검색
+    * **🤖 자동 모드:** `서울교통공사`, `서울지하철`, `도시철도` 3가지 키워드로 한 번에 검색합니다.
+        * **정렬:** 공사 > 지하철 > 도시철도 순으로 중요도가 자동 정렬됩니다.
+    * **⌨️ 수동 모드:** 원하는 키워드를 직접 입력하여 검색합니다.
+    * **옵션 (🌐 자체 기사 포함):** 체크 시 네이버 뉴스 링크가 없는 언론사 홈페이지 기사까지 수집합니다. (기본 해제)
+
+    ### 2. 뉴스 카드 색상 구분
+    * <span style='color:#2e7d32; font-weight:bold;'>■ 초록색</span> : **네이버 뉴스** (댓글/공감 확인 가능)
+    * <span style='color:#007bff; font-weight:bold;'>■ 파란색</span> : **언론사 홈페이지** (Outlink)
+    * <span style='color:black; font-weight:bold; background-color:#eee;'>■ 검정색</span> : **지면 기사** (중요도 높음)
+    * <span style='color:#adb5bd; font-weight:bold;'>■ 회색</span> : 이미 스크랩 목록에 추가된 기사
+
+    ### 3. 스크랩 및 기능
+    * **공사보도 / 기타보도:** 버튼을 누르면 하단 텍스트 상자에 기사가 추가됩니다.
+    * **📋 텍스트 복사:** 스크랩된 전체 내용을 클립보드에 복사합니다.
+    * **📧 메일 보내기:** 본인의 G메일 계정 설정을 통해 결과를 바로 전송합니다.
+    
+    ### 💡 팁
+    * 제목과 언론사가 동일한 중복 기사는 **자동으로 제거**됩니다.
+    * 모든 검색 및 발송 이력은 **구글 시트에 로그**로 남습니다.
+    """, unsafe_allow_html=True)
+
+# [NEW] 우측 상단 버튼 배치 (도움말 / 로그아웃)
 with c2:
     st.markdown("<div style='height: 15px;'></div>", unsafe_allow_html=True) 
-    if st.button("🔒 로그아웃", key="logout_btn", use_container_width=True):
-        st.session_state["logged_in"] = False
-        st.rerun()
+    b1, b2 = st.columns(2)
+    with b1:
+        if st.button("📖 도움말", use_container_width=True):
+            help_dialog()
+    with b2:
+        if st.button("🔒 로그아웃", key="logout_btn", use_container_width=True):
+            st.session_state["logged_in"] = False
+            st.rerun()
 
 t_date = get_target_date()
 weekdays = ["월", "화", "수", "목", "금", "토", "일"]
@@ -633,7 +665,7 @@ with st.expander("🔍 뉴스 검색 설정", expanded=True):
             st.rerun()
 
 # ==============================================================================
-# [9] 리스트 출력 함수 (카드 스타일 클래스 적용됨)
+# [9] 리스트 출력 함수
 # ==============================================================================
 def display_list(title, items, key_p):
     st.markdown(f'<div class="section-header">{title} ({len(items)}건)</div>', unsafe_allow_html=True)
@@ -646,7 +678,6 @@ def display_list(title, items, key_p):
         
         is_scraped = (item_txt in st.session_state.corp_list) or (item_txt in st.session_state.rel_list)
         
-        # [NEW] 카드 스타일 결정 로직
         if is_scraped:
             card_class = "bg-scraped"
         elif res['is_paper']:
@@ -661,7 +692,6 @@ def display_list(title, items, key_p):
         with col_m:
             badge_html = f"<span class='keyword-badge'>🔍 {src_kw}</span>" if src_kw else ""
             
-            # [수정] 클래스 변수(card_class) 적용
             st.markdown(f"""<div class="news-card {card_class}">
                 <div class="news-title">{badge_html}{res['title']}</div>
                 <div class="news-meta"><span style="font-weight:bold;">{d_val}</span> | {res['press']}</div>
@@ -690,8 +720,6 @@ def display_list(title, items, key_p):
 if st.session_state.search_results:
     res = st.session_state.search_results
     
-    # [수정] 카드 스타일 로직 변경으로 인해 굳이 그룹별로 리스트를 나눌 필요는 없으나,
-    # 헤더(지면/네이버/기타)를 구분해서 보여주는 현재 구조를 유지하는 것이 가독성에 좋습니다.
     p_news = [x for x in res if x['is_paper']]
     n_news = [x for x in res if x['is_naver'] and not x['is_paper']]
     o_news = [x for x in res if not x['is_naver'] and not x['is_paper']]
