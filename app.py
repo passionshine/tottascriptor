@@ -366,21 +366,21 @@ def display_list(title, items, key_p):
             b1, b2, b3 = st.columns(3, gap="small")
             
             with b1: # 1번: 원문 (링크)
-                st.link_button("원문", res['link'], use_container_width=True)
+                st.link_button("원문보기", res['link'], use_container_width=True)
             with b2: # 2번: 공사 (버튼)
-                if st.button("공사", key=f"c_{key_p}_{i}", use_container_width=True):
+                if st.button("공사보도", key=f"c_{key_p}_{i}", use_container_width=True):
                     if item_txt not in st.session_state.corp_list:
                         st.session_state.corp_list.append(item_txt)
-                        st.toast("🏢 공사 스크랩!", icon="✅"); time.sleep(0.5); st.rerun()
+                        st.toast("🏢 공사 관련 스크랩 완료!", icon="✅"); time.sleep(0.5); st.rerun()
                     else:
-                        st.toast("⚠️ 이미 있음", icon="❗")
+                        st.toast("⚠️ 이미 추가된 기사입니다", icon="❗")
             with b3: # 3번: 기타 (버튼)
-                if st.button("기타", key=f"r_{key_p}_{i}", use_container_width=True):
+                if st.button("기타보도", key=f"r_{key_p}_{i}", use_container_width=True):
                     if item_txt not in st.session_state.rel_list:
                         st.session_state.rel_list.append(item_txt)
-                        st.toast("🚆 유관 스크랩!", icon="✅"); time.sleep(0.5); st.rerun()
+                        st.toast("🚆 유관기관 기타 스크랩 완료!", icon="✅"); time.sleep(0.5); st.rerun()
                     else:
-                        st.toast("⚠️ 이미 있음", icon="❗")
+                        st.toast("⚠️ 이미 추가된 기사입니다.", icon="❗")
 
 if st.session_state.search_results:
     res = st.session_state.search_results
@@ -391,4 +391,5 @@ if st.session_state.search_results:
     if p_news: display_list("📰 지면 보도", p_news, "p")
     if n_news: display_list("🟢 네이버 뉴스", n_news, "n")
     if o_news: display_list("🌐 언론사 자체 뉴스", o_news, "o")
+
 
