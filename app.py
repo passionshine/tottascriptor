@@ -11,62 +11,40 @@ import smtplib
 from email.mime.text import MIMEText
 
 # ==============================================================================
-# [0] 페이지 기본 설정 (가장 먼저 실행되어야 함)
+# [0] 페이지 기본 설정
 # ==============================================================================
 st.set_page_config(page_title="Totta Scriptor", layout="wide", page_icon="🚇")
 
 # ==============================================================================
-# [1] 로그인(잠금) 시스템 구현
+# [1] 로그인(잠금) 시스템
 # ==============================================================================
-# 세션 상태 초기화
 if "logged_in" not in st.session_state:
     st.session_state["logged_in"] = False
 
 def check_password():
-    """비밀번호 확인 함수"""
-    # secrets에 설정된 비번 가져오기 (없으면 기본값 0000)
     try:
         correct_password = st.secrets["system"]["password"]
     except:
-        correct_password = "0000" # 설정 안했을 때 임시 비번
+        correct_password = "0000"
 
     if st.session_state["password_input"] == correct_password:
         st.session_state["logged_in"] = True
     else:
         st.error("🚫 비밀번호가 틀렸습니다.")
 
-# --- [로그인 대문 화면] ---
+# --- [로그인 대문] ---
 if not st.session_state["logged_in"]:
-    # 화면 중앙 정렬을 위한 여백
     st.markdown("<br><br><br>", unsafe_allow_html=True)
-    
     col1, col2, col3 = st.columns([1, 2, 1])
-    
     with col2:
         with st.container(border=True):
             st.markdown("<h1 style='text-align: center;'>🚇 Totta Scriptor</h1>", unsafe_allow_html=True)
             st.markdown("<p style='text-align: center; color: gray;'>관계자 외 접근 금지 (Authorized Personnel Only)</p>", unsafe_allow_html=True)
             st.divider()
-            
             st.text_input("접속 비밀번호를 입력하세요", type="password", key="password_input", on_change=check_password)
-            
             if st.button("로그인 (Login)", use_container_width=True, type="primary"):
                 check_password()
-                
-    # 로그인이 안 된 상태면 여기서 코드 실행 중단 (뉴스 검색 화면 안 보임)
     st.stop()
-
-
-# ##############################################################################
-# ▼▼▼▼▼ [여기서부터 인증된 사용자만 볼 수 있는 본문 코드] ▼▼▼▼▼
-# ##############################################################################
-
-# 사이드바에 로그아웃 버튼 추가
-with st.sidebar:
-    st.write(f"✅ 인증됨")
-    if st.button("🔒 로그아웃"):
-        st.session_state["logged_in"] = False
-        st.rerun()
 
 # ==============================================================================
 # [2] 사용량 카운트 관리
@@ -307,13 +285,20 @@ for key in ['corp_list', 'rel_list', 'search_results']:
     if key not in st.session_state: st.session_state[key] = []
 
 # ==============================================================================
-# [7] 메인 UI 구성 (뉴스 검색기)
+# [7] 메인 UI 구성 (사이드바 제거됨)
 # ==============================================================================
 c1, c2 = st.columns([0.8, 0.2])
-with c1: st.title("🚇 Totta Scriptor for web")
+
+with c1: 
+    st.title("🚇 Totta Scriptor for web")
+
+# 우측 상단에 로그아웃 버튼 배치
 with c2:
     current_usage = get_usage_count()
-    st.markdown(f"<div style='text-align:right; font-size:14px; color:#888; margin-top:20px;'>🔢 누적 실행: <b>{current_usage}</b>회</div>", unsafe_allow_html=True)
+    st.markdown(f"<div style='text-align:right; font-size:12px; color:#888; margin-bottom:5px;'>🔢 누적 실행: <b>{current_usage}</b>회</div>", unsafe_allow_html=True)
+    if st.button("🔒 로그아웃", key="logout_btn", use_container_width=True):
+        st.session_state["logged_in"] = False
+        st.rerun()
 
 # 날짜 헤더
 t_date = get_target_date()
