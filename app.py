@@ -129,7 +129,7 @@ def log_to_gsheets(keyword, count):
         
     except Exception as e:
         # 로그 실패해도 앱은 멈추지 않게 처리
-        print(f"로그 기록 실패: {e}")
+        st.error(f"구글 시트 에러 발생: {e}")
 
 # ==============================================================================
 # [4] 이메일 발송 함수
@@ -536,4 +536,5 @@ if st.session_state.search_results:
     if p_news: display_list("📰 지면 보도", p_news, "p")
     if n_news: display_list("🟢 네이버 뉴스", n_news, "n")
     if o_news: display_list("🌐 언론사 자체 뉴스", o_news, "o")
+
 
