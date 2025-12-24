@@ -99,17 +99,18 @@ def get_target_date():
 def log_to_gsheets(keyword, count):
     """구글 시트에 검색 기록을 저장합니다."""
     try:
-        # 1. 시트 연결 (secrets.toml 정보 사용)
+        # 1. 시트 연결
         conn = st.connection("gsheets", type=GSheetsConnection)
         
-        # 2. 기존 데이터 읽기 (오류 방지를 위해 5초 캐시)
+        # 2. 기존 데이터 읽기 (없으면 빈 데이터프레임 생성)
         try:
-            existing_data = conn.read(worksheet="Sheet1", usecols=list(range(5)), ttl=5)
-            # 만약 데이터가 비어있으면 초기화
-            if existing_data.empty:
-                 existing_data = pd.DataFrame(columns=["날짜", "시간", "검색어", "결과수", "상태"])
-        except:
-             existing_data = pd.DataFrame(columns=["날짜", "시간", "검색어", "결과수", "상태"])
+            # TTL을 0으로 설정해 즉시 갱신
+            existing_data = conn.read(worksheet="Sheet1", ttl=0)
+            if existing_data is None or existing_data.empty:
+                existing_data = pd.DataFrame(columns=["날짜", "시간", "검색어", "결과수", "상태"])
+        except Exception:
+            # 시트가 비어있거나 읽기 에러 시 초기화
+            existing_data = pd.DataFrame(columns=["날짜", "시간", "검색어", "결과수", "상태"])
 
         # 3. 새 데이터 생성
         now = datetime.datetime.now()
@@ -121,15 +122,18 @@ def log_to_gsheets(keyword, count):
             "상태": "성공"
         }])
         
-        # 4. 데이터 합치기
+        # 4. 데이터 합치기 (빈 컬럼 문제 해결을 위해 sort=False)
         updated_df = pd.concat([existing_data, new_row], ignore_index=True)
         
         # 5. 시트 업데이트
         conn.update(worksheet="Sheet1", data=updated_df)
         
+        # 성공 메시지 (테스트용, 잘 되면 주석 처리하세요)
+        # st.success("📝 로그 저장 완료!")
+        
     except Exception as e:
-        # 로그 실패해도 앱은 멈추지 않게 처리
-        st.error(f"구글 시트 에러 발생: {e}")
+        # 에러 내용을 화면에 표시
+        st.error(f"⚠️ 구글 시트 저장 실패: {e}")
 
 # ==============================================================================
 # [4] 이메일 발송 함수
@@ -536,5 +540,6 @@ if st.session_state.search_results:
     if p_news: display_list("📰 지면 보도", p_news, "p")
     if n_news: display_list("🟢 네이버 뉴스", n_news, "n")
     if o_news: display_list("🌐 언론사 자체 뉴스", o_news, "o")
+
 
 
