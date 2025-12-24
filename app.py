@@ -106,8 +106,8 @@ def get_target_date():
 # ==============================================================================
 # [3] 구글 시트 로그 기록 함수들
 # ==============================================================================
-def log_to_gsheets(keyword, count):
-    """(기본) 검색 기록을 저장합니다."""
+def log_to_gsheets(keyword, count, status="성공"):
+    """(기본) 검색 기록을 저장합니다. status 파라미터로 상태 변경 가능"""
     try:
         conn = st.connection("gsheets", type=GSheetsConnection)
         try:
@@ -117,14 +117,14 @@ def log_to_gsheets(keyword, count):
         except:
              existing_data = pd.DataFrame(columns=["날짜", "시간", "검색어", "결과수", "상태"])
 
+        # 한국 시간(KST) 적용
         now = datetime.datetime.now() + datetime.timedelta(hours=9)
-        
         new_row = pd.DataFrame([{
             "날짜": now.strftime("%Y-%m-%d"),
             "시간": now.strftime("%H:%M:%S"),
             "검색어": keyword,
             "결과수": count,
-            "상태": "성공"
+            "상태": status
         }])
         
         updated_df = pd.concat([existing_data, new_row], ignore_index=True)
@@ -143,7 +143,7 @@ def log_email_to_gsheets(receiver, subject):
         except:
             existing_data = pd.DataFrame(columns=["날짜", "시간", "검색어", "결과수", "상태"])
 
-        now = datetime.datetime.now()
+        now = datetime.datetime.now() + datetime.timedelta(hours=9)
         new_row = pd.DataFrame([{
             "날짜": now.strftime("%Y-%m-%d"),
             "시간": now.strftime("%H:%M:%S"),
@@ -168,7 +168,7 @@ def log_copy_to_gsheets():
         except:
             existing_data = pd.DataFrame(columns=["날짜", "시간", "검색어", "결과수", "상태"])
 
-        now = datetime.datetime.now()
+        now = datetime.datetime.now() + datetime.timedelta(hours=9)
         new_row = pd.DataFrame([{
             "날짜": now.strftime("%Y-%m-%d"),
             "시간": now.strftime("%H:%M:%S"),
@@ -183,7 +183,7 @@ def log_copy_to_gsheets():
         print(f"복사 로그 저장 실패: {e}")
 
 # ==============================================================================
-# [4] 이메일 발송 함수
+# [4] 이메일 발송 함수 & 비상 알림 함수
 # ==============================================================================
 def send_email_gmail(sender_email, sender_pw, receiver_email, subject, content):
     try:
@@ -202,6 +202,30 @@ def send_email_gmail(sender_email, sender_pw, receiver_email, subject, content):
         return True, "✅ 메일 전송 성공!"
     except Exception as e:
         return False, f"❌ 전송 실패: {e}"
+
+# [NEW] 비상 상황 알림 메일 함수
+def send_emergency_alert():
+    try:
+        # Secrets에서 정보 가져오기
+        sender_id = st.secrets["gmail"]["id"]
+        sender_pw = st.secrets["gmail"]["pw"]
+        receiver_id = "lueam1226@naver.com"
+        
+        subject = "🚨 [긴급] 스크립터 점검 필요 (검색 실패)"
+        content = """
+        관리자님, Totta Scriptor에서 검색 결과가 0건으로 반환되었습니다.
+        네이버 뉴스 페이지의 HTML 구조가 변경되었을 가능성이 높습니다.
+        
+        조치 방법:
+        1. 크롬 개발자 도구(F12) 확인
+        2. app.py의 NewsScraper 클래스 내 선택자(selector) 점검
+        3. 'news_tit' 등의 클래스명이 변경되었는지 확인 바랍니다.
+        """
+        
+        send_email_gmail(sender_id, sender_pw, receiver_id, subject, content)
+        return True
+    except:
+        return False
 
 # ==============================================================================
 # [5] 뉴스 스크래퍼
@@ -282,6 +306,8 @@ class NewsScraper:
                     if response.status_code != 200: continue
 
                     soup = BeautifulSoup(response.content, 'html.parser')
+                    
+                    # [유지보수 포인트] 여기가 가장 중요합니다. 기사 제목을 찾는 선택자입니다.
                     items = soup.select('a[data-heatmap-target=".tit"]') or soup.select('a.news_tit')
                     if not items: break
 
@@ -328,6 +354,11 @@ class NewsScraper:
 
                         if not include_others and not is_naver and not is_paper:
                             continue
+
+                        # 자체 기사는 서울교통공사 키워드일 때만 수집
+                        is_outlink = not is_naver and not is_paper
+                        if is_outlink and keyword in ["서울지하철", "도시철도"]:
+                             continue
 
                         unique_key = (title.replace(" ", ""), press_name.replace(" ", ""))
                         
@@ -481,7 +512,8 @@ def help_dialog():
     * **🤖 자동 모드:** `서울교통공사`, `서울지하철`, `도시철도` 3가지 키워드로 한 번에 검색합니다.
         * **정렬:** 공사 > 지하철 > 도시철도 순으로 중요도가 자동 정렬됩니다.
     * **⌨️ 수동 모드:** 원하는 키워드를 직접 입력하여 검색합니다.
-    * **옵션 (🌐 자체 기사 포함):** 체크 시 네이버 뉴스 링크가 없는 언론사 홈페이지 기사까지 수집합니다. (기본 해제)
+    * **옵션 (🌐 자체 기사 포함):** 체크 시 네이버 뉴스 링크가 없는 언론사 홈페이지 기사까지 수집합니다. (기본값: 포함)
+        * ⚠️ 단, 자체 기사는 **'서울교통공사' 키워드로 검색된 경우에만** 수집됩니다.
 
     ### 2. 뉴스 카드 색상 구분
     * <span style='color:#2e7d32; font-weight:bold;'>■ 초록색</span> : **네이버 뉴스** (댓글/공감 확인 가능)
@@ -566,7 +598,7 @@ def email_dialog(content):
             receiver_id = ""
 
     st.markdown("**메일 제목**")
-    mail_title = st.text_input("메일 제목", value=f"[{t_date.month}/{t_date.day}] 뉴스 스크랩", label_visibility="collapsed")
+    mail_title = st.text_input("메일 제목", value=f"[{t_date.month}/{t_date.day}] 뉴스 스크랩 보고", label_visibility="collapsed")
     
     st.markdown("") 
 
@@ -652,13 +684,24 @@ with st.expander("🔍 뉴스 검색 설정", expanded=True):
         mx = st.slider("최대 기사 수 (전체 합계)", 10, 100, 30)
     with c_opt2:
         st.markdown("<div style='margin-top: 25px;'></div>", unsafe_allow_html=True)
-        include_others = st.checkbox("🌐 언론사 자체 기사(Outlink) 포함", value=False, help="체크하면 네이버 뉴스 링크가 없는 언론사 자체 페이지도 수집합니다.")
+        # [수정] 기본값 True로 변경
+        include_others = st.checkbox("🌐 언론사 자체 기사(Outlink) 포함", value=True, help="체크하면 네이버 뉴스 링크가 없는 언론사 자체 페이지도 수집합니다. (단, 서울교통공사 키워드일 때만)")
 
     if st.button("🚀 뉴스 검색 시작", type="primary", use_container_width=True):
         results = NewsScraper().fetch_news(sd, ed, search_keywords, mx, include_others)
         
+        # [NEW] 결과가 없을 때 (0건) -> 비상 상황으로 간주하여 알림 발송
         if not results:
-            st.error("검색 결과가 없습니다. 날짜 범위나 키워드를 확인해주세요.")
+            # 1. 화면에 에러 표시
+            st.error("검색 결과가 없습니다. (HTML 구조 변경 가능성 있음)")
+            st.warning("관리자(lueam1226@naver.com)에게 점검 요청 메일을 발송했습니다.")
+            
+            # 2. 비상 메일 발송
+            send_emergency_alert()
+            
+            # 3. 구글 시트에 긴급 점검 로그 남기기 (노란색 강조 대신 이모지로 대체)
+            log_to_gsheets(log_keyword, 0, "🟡🚨 긴급점검요망")
+            
         else:
             st.session_state.search_results = results
             log_to_gsheets(log_keyword, len(results))
@@ -727,7 +770,3 @@ if st.session_state.search_results:
     if p_news: display_list("📰 지면 보도", p_news, "p")
     if n_news: display_list("🟢 네이버 뉴스", n_news, "n")
     if o_news: display_list("🌐 언론사 자체 뉴스", o_news, "o")
-
-
-
-
