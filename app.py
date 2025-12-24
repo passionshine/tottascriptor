@@ -150,7 +150,7 @@ st.markdown("""
     /* 뉴스 카드 스타일 */
     .news-card { 
         padding: 12px 16px; border-radius: 8px; border-left: 5px solid #007bff; 
-        box-shadow: 0 2px 4px rgba(0,0,0,0.08); background: white; margin-bottom: 5px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.08); background: #f9f9f9; margin-bottom: 5px;
     }
     .bg-scraped { background: #f8f9fa !important; border-left: 5px solid #adb5bd !important; opacity: 0.7; }
     .news-title { font-size: 17px !important; font-weight: 700; color: #222; margin-bottom: 5px; line-height: 1.4; }
@@ -280,6 +280,7 @@ if st.session_state.search_results:
     if p_news: display_list("📰 지면 보도", p_news, "p")
     if n_news: display_list("🟢 네이버 뉴스", n_news, "n")
     if o_news: display_list("🌐 언론사 자체 뉴스", o_news, "o")
+
 
 
 
