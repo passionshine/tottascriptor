@@ -591,7 +591,7 @@ def email_dialog(content):
     with r_c2:
         st.markdown("<div style='text-align:center; padding-top:10px; font-weight:bold;'>@</div>", unsafe_allow_html=True)
     with r_c3:
-        domains = ["seoulmetro.co.kr", "naver.com", "gmail.com", "daum.net", "google.com", "직접입력"]
+        domains = ["naver.com","seoulmetro.co.kr",  "gmail.com", "daum.net", "google.com", "직접입력"]
         selected_domain = st.selectbox("도메인선택", domains, label_visibility="collapsed")
 
     if selected_domain == "직접입력":
@@ -607,7 +607,7 @@ def email_dialog(content):
             receiver_id = ""
 
     st.markdown("**메일 제목**")
-    mail_title = st.text_input("메일 제목", value=f"[{t_date.month}/{t_date.day}] 뉴스 스크랩 보고", label_visibility="collapsed")
+    mail_title = st.text_input("메일 제목", value=f"[{t_date.month}/{t_date.day}] 뉴스 스크랩", label_visibility="collapsed")
     
     st.markdown("") 
 
@@ -774,6 +774,7 @@ if st.session_state.search_results:
     if p_news: display_list("📰 지면 보도", p_news, "p")
     if n_news: display_list("🟢 네이버 뉴스", n_news, "n")
     if o_news: display_list("🌐 언론사 자체 뉴스", o_news, "o")
+
 
 
 
