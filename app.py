@@ -268,7 +268,7 @@ date_header = f"<{t_date.month}월 {t_date.day}일({w_str}) 조간 스크랩>"
 final_output = f"{date_header}\n\n[공사 관련 보도]\n" + "".join(st.session_state.corp_list) + "\n[유관기관 관련 등 기타 보도]\n" + "".join(st.session_state.rel_list)
 
 # --------------------------------------------------------------------------
-# [POPUP] 이메일 전송 다이얼로그 (도메인 선택 기능 적용)
+# [POPUP] 이메일 전송 다이얼로그
 # --------------------------------------------------------------------------
 @st.dialog("📧 결과 메일 보내기")
 def email_dialog(content):
@@ -286,7 +286,7 @@ def email_dialog(content):
 
     # 1. 보내는 사람 정보
     if has_secrets:
-        st.success("🔒 구글 계정 정보가 안전하게 로드되었습니다.")
+        # [수정] 성공 메시지 삭제
         sender_id = default_id
         sender_pw = default_pw
     else:
@@ -297,19 +297,16 @@ def email_dialog(content):
     # 2. 받는 사람 정보 (아이디 + 도메인 선택)
     st.markdown("**받는 사람**", help="아이디 입력 후 도메인을 선택하세요.")
     
-    # 컬럼 비율: [아이디 입력(3)] [골뱅이(0.5)] [도메인 선택(3.5)]
     r_c1, r_c2, r_c3 = st.columns([3, 0.4, 3.6])
     
     with r_c1:
         receiver_user = st.text_input("받는사람ID", placeholder="userid", label_visibility="collapsed")
     with r_c2:
-        # 골뱅이(@)를 중앙 정렬
         st.markdown("<div style='text-align:center; padding-top:10px; font-weight:bold;'>@</div>", unsafe_allow_html=True)
     with r_c3:
         domains = ["seoulmetro.co.kr", "naver.com", "gmail.com", "daum.net", "google.com", "직접입력"]
         selected_domain = st.selectbox("도메인선택", domains, label_visibility="collapsed")
 
-    # 직접 입력 선택 시 추가 입력창 표시
     if selected_domain == "직접입력":
         custom_domain = st.text_input("도메인 직접 입력", placeholder="company.com")
         if receiver_user and custom_domain:
@@ -326,7 +323,7 @@ def email_dialog(content):
     st.markdown("**메일 제목**")
     mail_title = st.text_input("메일 제목", value=f"[{t_date.month}/{t_date.day}] 뉴스 스크랩 보고", label_visibility="collapsed")
     
-    st.markdown("") # 간격 띄우기
+    st.markdown("") 
 
     if st.button("🚀 전송하기", use_container_width=True, type="primary"):
         if not sender_id or not sender_pw or not receiver_id:
