@@ -47,28 +47,6 @@ if not st.session_state["logged_in"]:
     st.stop()
 
 # ==============================================================================
-# [2] 사용량 카운트 관리
-# ==============================================================================
-USAGE_FILE = "usage_log.json"
-
-def get_usage_count():
-    if not os.path.exists(USAGE_FILE):
-        return 0
-    try:
-        with open(USAGE_FILE, "r", encoding="utf-8") as f:
-            data = json.load(f)
-            return data.get("count", 0)
-    except:
-        return 0
-
-def increment_usage_count():
-    current_count = get_usage_count()
-    new_count = current_count + 1
-    with open(USAGE_FILE, "w", encoding="utf-8") as f:
-        json.dump({"count": new_count}, f)
-    return new_count
-
-# ==============================================================================
 # [3] 스마트 날짜 계산
 # ==============================================================================
 def get_target_date():
@@ -496,3 +474,4 @@ if st.session_state.search_results:
     if p_news: display_list("📰 지면 보도", p_news, "p")
     if n_news: display_list("🟢 네이버 뉴스", n_news, "n")
     if o_news: display_list("🌐 언론사 자체 뉴스", o_news, "o")
+
