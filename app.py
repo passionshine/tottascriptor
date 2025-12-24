@@ -199,7 +199,7 @@ st.markdown("""
         font-family: "Source Sans Pro", sans-serif !important;
     }
 
-    /* 3. [상단 툴바] 복사/메일/초기화 버튼 스타일 통일 */
+    /* 3. [상단 툴바] 버튼 스타일 통일 */
     div[data-testid="stVerticalBlockBorderWrapper"] .stButton > button {
         background-color: white !important;
         color: #31333F !important;
@@ -268,13 +268,13 @@ date_header = f"<{t_date.month}월 {t_date.day}일({w_str}) 조간 스크랩>"
 final_output = f"{date_header}\n\n[공사 관련 보도]\n" + "".join(st.session_state.corp_list) + "\n[유관기관 관련 등 기타 보도]\n" + "".join(st.session_state.rel_list)
 
 # --------------------------------------------------------------------------
-# [POPUP] 이메일 전송 다이얼로그 함수
+# [POPUP] 이메일 전송 다이얼로그 (도메인 선택 기능 적용)
 # --------------------------------------------------------------------------
 @st.dialog("📧 결과 메일 보내기")
 def email_dialog(content):
     st.caption("아래 정보를 입력하여 뉴스 스크랩 결과를 메일로 전송합니다.")
     
-    # Secrets 가져오기 (오류 방지 로직)
+    # Secrets 가져오기
     try:
         default_id = st.secrets["gmail"]["id"]
         default_pw = st.secrets["gmail"]["pw"]
@@ -290,16 +290,47 @@ def email_dialog(content):
         sender_id = default_id
         sender_pw = default_pw
     else:
-        sender_id = st.text_input("보내는 구글 메일", placeholder="example@gmail.com")
-        sender_pw = st.text_input("구글 앱 비밀번호", type="password")
+        st.markdown("**보내는 사람**")
+        sender_id = st.text_input("보내는 구글 메일", placeholder="example@gmail.com", label_visibility="collapsed")
+        sender_pw = st.text_input("구글 앱 비밀번호", type="password", label_visibility="collapsed")
 
-    # 2. 받는 사람 및 제목
-    receiver_id = st.text_input("받는 사람 이메일", placeholder="boss@company.com")
-    mail_title = st.text_input("메일 제목", value=f"[{t_date.month}/{t_date.day}] 뉴스 스크랩 보고")
+    # 2. 받는 사람 정보 (아이디 + 도메인 선택)
+    st.markdown("**받는 사람**", help="아이디 입력 후 도메인을 선택하세요.")
+    
+    # 컬럼 비율: [아이디 입력(3)] [골뱅이(0.5)] [도메인 선택(3.5)]
+    r_c1, r_c2, r_c3 = st.columns([3, 0.4, 3.6])
+    
+    with r_c1:
+        receiver_user = st.text_input("받는사람ID", placeholder="userid", label_visibility="collapsed")
+    with r_c2:
+        # 골뱅이(@)를 중앙 정렬
+        st.markdown("<div style='text-align:center; padding-top:10px; font-weight:bold;'>@</div>", unsafe_allow_html=True)
+    with r_c3:
+        domains = ["seoulmetro.co.kr", "naver.com", "gmail.com", "daum.net", "google.com", "직접입력"]
+        selected_domain = st.selectbox("도메인선택", domains, label_visibility="collapsed")
+
+    # 직접 입력 선택 시 추가 입력창 표시
+    if selected_domain == "직접입력":
+        custom_domain = st.text_input("도메인 직접 입력", placeholder="company.com")
+        if receiver_user and custom_domain:
+            receiver_id = f"{receiver_user}@{custom_domain}"
+        else:
+            receiver_id = ""
+    else:
+        if receiver_user:
+            receiver_id = f"{receiver_user}@{selected_domain}"
+        else:
+            receiver_id = ""
+
+    # 3. 메일 제목
+    st.markdown("**메일 제목**")
+    mail_title = st.text_input("메일 제목", value=f"[{t_date.month}/{t_date.day}] 뉴스 스크랩 보고", label_visibility="collapsed")
+    
+    st.markdown("") # 간격 띄우기
 
     if st.button("🚀 전송하기", use_container_width=True, type="primary"):
         if not sender_id or not sender_pw or not receiver_id:
-            st.error("필수 정보를 모두 입력해주세요.")
+            st.error("이메일 정보를 모두 입력해주세요.")
         elif not content.strip():
             st.warning("보낼 내용이 없습니다.")
         else:
@@ -308,7 +339,7 @@ def email_dialog(content):
                 if success:
                     st.success(msg)
                     time.sleep(1.5)
-                    st.rerun() # 전송 후 닫기
+                    st.rerun()
                 else:
                     st.error(msg)
 
@@ -316,7 +347,6 @@ def email_dialog(content):
 # [TOOLBAR] 복사 / 메일 / 초기화 버튼
 # --------------------------------------------------------------------------
 with st.container(border=True):
-    # 컬럼 3개 생성 (비율 1:1:1)
     cb1, cb2, cb3 = st.columns(3)
     
     # 1. 복사 버튼
@@ -348,7 +378,7 @@ with st.container(border=True):
         else:
             st.button("📋 텍스트 복사", disabled=True, use_container_width=True)
 
-    # 2. 메일 보내기 버튼 (팝업 호출)
+    # 2. 메일 보내기 버튼
     with cb2:
         if st.button("📧 메일 보내기", use_container_width=True):
             email_dialog(final_output)
