@@ -200,17 +200,42 @@ final_output = f"{date_header}\n\n[공사 관련 보도]\n" + "".join(st.session
 text_height = max(150, (final_output.count('\n') + 1) * 22)
 st.text_area("📋 최종 스크랩 텍스트", value=final_output, height=text_height)
 
-# 복사 버튼 (JavaScript)
-if final_output.strip() != date_header.strip():
-    components.html(f"""
-        <button onclick="copy()" style="width:100%; height:40px; background:#007bff; color:white; border:none; border-radius:5px; cursor:pointer; font-weight:bold;">📋 텍스트 복사하기</button>
-        <textarea id="t" style="position:absolute;top:-9999px">{final_output}</textarea>
-        <script>function copy(){{var t=document.getElementById("t");t.select();document.execCommand("copy");alert("✅ 복사되었습니다!");}}</script>
-    """, height=50)
+with st.container(border=True):
+    # 반반 비율로 컬럼 나누기
+    cb1, cb2 = st.columns(2)
+    
+    with cb1:
+        # [복사 버튼] 내용이 있을 때만 활성화
+        if final_output.strip() != date_header.strip():
+            # Streamlit 버튼과 비슷하게 생긴 CSS 정의
+            btn_css = """
+                width: 100%; height: 38px; background-color: white; color: #31333F;
+                border: 1px solid #e0e0e0; border-radius: 4px; cursor: pointer;
+                font-size: 12px; font-weight: 600; font-family: sans-serif;
+                display: flex; align-items: center; justify-content: center;
+            """
+            js_code = f"""
+            <textarea id="copy_target" style="position:absolute;top:-9999px;">{final_output}</textarea>
+            <button onclick="copyToClipboard()" style="{btn_css}" onmouseover="this.style.borderColor='#ff4b4b';this.style.color='#ff4b4b'" onmouseout="this.style.borderColor='#e0e0e0';this.style.color='#31333F'">📋 텍스트 복사</button>
+            <script>
+                function copyToClipboard() {{
+                    var t = document.getElementById("copy_target");
+                    t.select();
+                    document.execCommand("copy");
+                    alert("✅ 복사되었습니다!");
+                }}
+            </script>
+            """
+            components.html(js_code, height=40)
+        else:
+            # 내용 없을 땐 비활성 버튼 표시
+            st.button("📋 텍스트 복사", disabled=True, use_container_width=True)
 
-if st.button("🗑️ 전체 초기화"):
-    st.session_state.corp_list, st.session_state.rel_list = [], []
-    st.rerun()
+    with cb2:
+        # [초기화 버튼]
+        if st.button("🗑️ 전체 초기화", use_container_width=True):
+            st.session_state.corp_list, st.session_state.rel_list = [], []
+            st.rerun()
 
 st.divider()
 
@@ -280,6 +305,7 @@ if st.session_state.search_results:
     if p_news: display_list("📰 지면 보도", p_news, "p")
     if n_news: display_list("🟢 네이버 뉴스", n_news, "n")
     if o_news: display_list("🌐 언론사 자체 뉴스", o_news, "o")
+
 
 
 
