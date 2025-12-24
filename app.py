@@ -203,7 +203,7 @@ def send_email_gmail(sender_email, sender_pw, receiver_email, subject, content):
         return False, f"❌ 전송 실패: {e}"
 
 # ==============================================================================
-# [5] 뉴스 스크래퍼 (우선순위 정렬 적용)
+# [5] 뉴스 스크래퍼 (자체 기사 필터링 옵션 추가)
 # ==============================================================================
 class NewsScraper:
     def __init__(self):
@@ -233,11 +233,11 @@ class NewsScraper:
         except:
             return now - datetime.timedelta(days=365)
 
-    def fetch_news(self, start_d, end_d, keywords, max_articles):
+    # [수정] include_others 옵션 추가
+    def fetch_news(self, start_d, end_d, keywords, max_articles, include_others=True):
         if isinstance(keywords, str):
             keywords = [keywords]
 
-        # [NEW] 키워드별 우선순위 매핑 (숫자가 작을수록 상단 노출)
         priority_map = {
             "서울교통공사": 0,
             "서울지하철": 1,
@@ -258,14 +258,14 @@ class NewsScraper:
         
         for k_idx, keyword in enumerate(keywords):
             query = f'"{keyword}"'
-            # 우선순위를 정함 (목록에 없으면 99로 맨 뒤로)
             rank_score = priority_map.get(keyword, 99)
             
             limit_per_keyword = max_articles if total_keywords == 1 else int(max_articles * 0.6)
             base_url = "https://search.naver.com/search.naver?where=news&query={}&sm=tab_pge&sort=1&photo=0&pd=3&ds={}&de={}&nso={}&qdt=1&start={}"
             
             current_count = 0
-            max_pages = (limit_per_keyword // 10) + 1
+            # 충분한 기사를 확보하기 위해 검색 페이지를 좀 더 여유있게 돔 (필터링 때문에)
+            max_pages = (limit_per_keyword // 10) + 3 
 
             for page in range(1, max_pages + 1):
                 if current_count >= limit_per_keyword: break
@@ -326,6 +326,10 @@ class NewsScraper:
                                 paper_info = " (지면)"
                                 is_paper = True
 
+                        # [NEW] 필터링 로직: 자체 기사 포함 옵션이 꺼져있고, 네이버/지면 기사가 아니면 건너뜀
+                        if not include_others and not is_naver and not is_paper:
+                            continue
+
                         if final_link in seen_links: continue
                         seen_links.add(final_link)
                         
@@ -338,7 +342,7 @@ class NewsScraper:
                             'date': article_date,
                             'source_keyword': keyword,
                             'datetime': self.parse_date(article_date),
-                            'rank': rank_score # 정렬을 위한 랭크 점수 저장
+                            'rank': rank_score
                         })
                         current_count += 1
                     time.sleep(0.3)
@@ -347,15 +351,7 @@ class NewsScraper:
         progress_bar.empty()
         status_text.empty()
         
-        # [NEW] 이중 정렬 로직
-        # 1차 정렬: 날짜 최신순 (내림차순)
-        # 2차 정렬: 우선순위 랭크 (오름차순, 숫자가 작을수록 위로)
-        # 파이썬 sort는 안정적(Stable)이므로, 날짜순 정렬 후 -> 랭크순 정렬하면
-        # 같은 랭크 내에서는 날짜순이 유지됨.
-        
-        # 1. 날짜순 정렬 (최신순)
         all_results.sort(key=lambda x: x['datetime'], reverse=True)
-        # 2. 우선순위별 정렬 (서울교통공사 -> 서울지하철 -> 도시철도)
         all_results.sort(key=lambda x: x['rank'])
         
         return all_results[:max_articles]
@@ -563,7 +559,7 @@ st.text_area("스크랩 결과", value=final_output, height=text_height, label_v
 st.divider()
 
 # ==============================================================================
-# [8] 검색 설정
+# [8] 검색 설정 (자체 기사 포함 옵션 추가됨)
 # ==============================================================================
 with st.expander("🔍 뉴스 검색 설정", expanded=True):
     mode = st.radio("검색 모드 선택", ["🤖 자동 (서울교통공사 + 서울지하철 + 도시철도)", "⌨️ 수동 입력"], horizontal=True)
@@ -584,10 +580,19 @@ with st.expander("🔍 뉴스 검색 설정", expanded=True):
 
     with col2: sd = st.date_input("시작", datetime.date.today() - datetime.timedelta(days=1))
     with col3: ed = st.date_input("종료", datetime.date.today())
-    mx = st.slider("최대 기사 수 (전체 합계)", 10, 100, 30)
     
+    # [수정] 옵션 추가 (자체 기사 포함 여부)
+    c_opt1, c_opt2 = st.columns([1, 1])
+    with c_opt1:
+        mx = st.slider("최대 기사 수 (전체 합계)", 10, 100, 30)
+    with c_opt2:
+        st.markdown("<div style='margin-top: 25px;'></div>", unsafe_allow_html=True)
+        # 기본값 False(해제)로 설정하여 알짜배기만 검색
+        include_others = st.checkbox("🌐 언론사 자체 기사(Outlink) 포함", value=False, help="체크하면 네이버 뉴스 링크가 없는 언론사 자체 페이지도 수집합니다.")
+
     if st.button("🚀 뉴스 검색 시작", type="primary", use_container_width=True):
-        results = NewsScraper().fetch_news(sd, ed, search_keywords, mx)
+        # [수정] 옵션 전달
+        results = NewsScraper().fetch_news(sd, ed, search_keywords, mx, include_others)
         
         if not results:
             st.error("검색 결과가 없습니다. 날짜 범위나 키워드를 확인해주세요.")
