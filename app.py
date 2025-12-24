@@ -66,7 +66,26 @@ if not st.session_state["logged_in"]:
 
             # [C] 입력 필드 및 버튼 영역
             st.text_input("비밀번호", type="password", key="password_input", on_change=check_password, placeholder="비밀번호 입력")
-            
+                # 비밀번호 입력칸 스타일링 (글씨 크기 및 높이 줄임)
+            st.markdown(
+                """
+                <style>
+                /* 비밀번호 입력창 내부의 실제 입력 필드 타겟팅 */
+                .stTextInput input[type="password"] {
+                    font-size: 13px !important;  /* 글씨 크기 (원하는대로 조절 가능) */
+                    height: 32px !important;     /* 입력창 높이 */
+                    min-height: 32px !important; /* 최소 높이 */
+                    padding: 0 10px !important;  /* 내부 여백 */
+                }
+                /* 입력창을 감싸는 컨테이너 높이도 같이 조절 */
+                .stTextInput > div > div {
+                    height: 32px !important;
+                    min-height: 32px !important;
+                }
+                </style>
+                """,
+                unsafe_allow_html=True
+            )
 
 
             
@@ -490,7 +509,7 @@ def display_list(title, items, key_p):
             with b1: # 1번: 원문
                 st.link_button("원문보기", res['link'], use_container_width=True)
             with b2: # 2번: 공사
-                if st.button("공사보도", key=f"c_{key_p}_{i}", use_container_width=True):
+                if st.button("공사보도", key=f"c_{key_p}_{i}", uqse_container_width=True):
                     if item_txt not in st.session_state.corp_list:
                         st.session_state.corp_list.append(item_txt)
                         st.toast("🏢 공사 관련 스크랩 완료!", icon="✅"); time.sleep(0.5); st.rerun()
@@ -513,6 +532,7 @@ if st.session_state.search_results:
     if p_news: display_list("📰 지면 보도", p_news, "p")
     if n_news: display_list("🟢 네이버 뉴스", n_news, "n")
     if o_news: display_list("🌐 언론사 자체 뉴스", o_news, "o")
+
 
 
 
