@@ -117,7 +117,8 @@ def log_to_gsheets(keyword, count):
         except:
              existing_data = pd.DataFrame(columns=["날짜", "시간", "검색어", "결과수", "상태"])
 
-        now = datetime.datetime.now()
+        now = datetime.datetime.now() + datetime.timedelta(hours=9)
+        
         new_row = pd.DataFrame([{
             "날짜": now.strftime("%Y-%m-%d"),
             "시간": now.strftime("%H:%M:%S"),
@@ -726,6 +727,7 @@ if st.session_state.search_results:
     if p_news: display_list("📰 지면 보도", p_news, "p")
     if n_news: display_list("🟢 네이버 뉴스", n_news, "n")
     if o_news: display_list("🌐 언론사 자체 뉴스", o_news, "o")
+
 
 
 
