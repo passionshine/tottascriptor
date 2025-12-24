@@ -200,23 +200,38 @@ final_output = f"{date_header}\n\n[공사 관련 보도]\n" + "".join(st.session
 text_height = max(150, (final_output.count('\n') + 1) * 22)
 st.text_area("📋 최종 스크랩 텍스트", value=final_output, height=text_height)
 
+
+
+
+
+
+
+
+
 with st.container(border=True):
     # 반반 비율로 컬럼 나누기
     cb1, cb2 = st.columns(2)
     
-    with cb1:
-        # [복사 버튼] 내용이 있을 때만 활성화
+with cb1:
         if final_output.strip() != date_header.strip():
-            # Streamlit 버튼과 비슷하게 생긴 CSS 정의
             btn_css = """
                 width: 100%; height: 38px; background-color: white; color: #31333F;
                 border: 1px solid #e0e0e0; border-radius: 4px; cursor: pointer;
                 font-size: 12px; font-weight: 600; font-family: sans-serif;
                 display: flex; align-items: center; justify-content: center;
+                box-sizing: border-box; /* 테두리 포함 크기 계산 */
             """
             js_code = f"""
+            <style>
+                /* 이프레임 내부 바디 여백을 완전히 없애야 합니다 */
+                body {{ margin: 0; padding: 0; overflow: hidden; }}
+            </style>
             <textarea id="copy_target" style="position:absolute;top:-9999px;">{final_output}</textarea>
-            <button onclick="copyToClipboard()" style="{btn_css}" onmouseover="this.style.borderColor='#ff4b4b';this.style.color='#ff4b4b'" onmouseout="this.style.borderColor='#e0e0e0';this.style.color='#31333F'">📋 텍스트 복사</button>
+            <button onclick="copyToClipboard()" style="{btn_css}" 
+                onmouseover="this.style.borderColor='#ff4b4b';this.style.color='#ff4b4b'" 
+                onmouseout="this.style.borderColor='#e0e0e0';this.style.color='#31333F'">
+                📋 텍스트 복사
+            </button>
             <script>
                 function copyToClipboard() {{
                     var t = document.getElementById("copy_target");
@@ -226,16 +241,10 @@ with st.container(border=True):
                 }}
             </script>
             """
-            components.html(js_code, height=40)
+            # height를 38로 맞춰야 st.button과 동일한 높이가 됩니다.
+            components.html(js_code, height=38)
         else:
-            # 내용 없을 땐 비활성 버튼 표시
             st.button("📋 텍스트 복사", disabled=True, use_container_width=True)
-
-    with cb2:
-        # [초기화 버튼]
-        if st.button("🗑️ 전체 초기화", use_container_width=True):
-            st.session_state.corp_list, st.session_state.rel_list = [], []
-            st.rerun()
 
 st.divider()
 
@@ -305,6 +314,7 @@ if st.session_state.search_results:
     if p_news: display_list("📰 지면 보도", p_news, "p")
     if n_news: display_list("🟢 네이버 뉴스", n_news, "n")
     if o_news: display_list("🌐 언론사 자체 뉴스", o_news, "o")
+
 
 
 
