@@ -60,7 +60,7 @@ if not st.session_state["logged_in"]:
                 if os.path.exists("logo.png"):
                     st.image("logo.png", use_container_width=True)
                 else:
-                    st.markdown("<h2 style='text-align: center; color: #2c3e50;'> Totta Scriptor</h2>", unsafe_allow_html=True)
+                    st.markdown("<h1 style='text-align: center; color: #2c3e50;'>🚇 Totta Scriptor</h1>", unsafe_allow_html=True)
             
             st.markdown("""
                 <div style='text-align: center; margin-bottom: 30px; margin-top: 10px;'>
@@ -203,7 +203,7 @@ def send_email_gmail(sender_email, sender_pw, receiver_email, subject, content):
         return False, f"❌ 전송 실패: {e}"
 
 # ==============================================================================
-# [5] 뉴스 스크래퍼 (복합 키워드 및 최신순 정렬 지원)
+# [5] 뉴스 스크래퍼 (우선순위 정렬 적용)
 # ==============================================================================
 class NewsScraper:
     def __init__(self):
@@ -213,7 +213,6 @@ class NewsScraper:
             'Referer': 'https://www.naver.com/'
         }
 
-    # 날짜 문자열을 정렬 가능한 datetime 객체로 변환하는 헬퍼 함수
     def parse_date(self, date_str):
         now = datetime.datetime.now()
         try:
@@ -230,15 +229,20 @@ class NewsScraper:
                 weeks = int(re.search(r'(\d+)', date_str).group(1))
                 return now - datetime.timedelta(weeks=weeks)
             else:
-                # 2024.01.01 같은 형식
                 return datetime.datetime.strptime(date_str.replace('.', '-'), "%Y-%m-%d")
         except:
-            return now - datetime.timedelta(days=365) # 파싱 실패시 아주 옛날로
+            return now - datetime.timedelta(days=365)
 
     def fetch_news(self, start_d, end_d, keywords, max_articles):
-        # keywords가 리스트가 아니면 리스트로 변환
         if isinstance(keywords, str):
             keywords = [keywords]
+
+        # [NEW] 키워드별 우선순위 매핑 (숫자가 작을수록 상단 노출)
+        priority_map = {
+            "서울교통공사": 0,
+            "서울지하철": 1,
+            "도시철도": 2
+        }
 
         ds, de = start_d.strftime("%Y.%m.%d"), end_d.strftime("%Y.%m.%d")
         nso = f"so:dd,p:from{start_d.strftime('%Y%m%d')}to{end_d.strftime('%Y%m%d')}"
@@ -252,14 +256,12 @@ class NewsScraper:
 
         total_keywords = len(keywords)
         
-        # 키워드별로 순회하며 수집
         for k_idx, keyword in enumerate(keywords):
             query = f'"{keyword}"'
-            # 키워드가 여러개면 1/N 만큼만 가져오지 않고, 전체 맥스를 유지하되 중복 제거 (비효율적일 수 있으나 정확함)
-            # 여기서는 속도를 위해 키워드별로 max_articles의 60% 정도만 가져와서 합치도록 조정
-            limit_per_keyword = max_articles if total_keywords == 1 else int(max_articles * 0.6)
+            # 우선순위를 정함 (목록에 없으면 99로 맨 뒤로)
+            rank_score = priority_map.get(keyword, 99)
             
-            # sort=1 (최신순) 설정 적용
+            limit_per_keyword = max_articles if total_keywords == 1 else int(max_articles * 0.6)
             base_url = "https://search.naver.com/search.naver?where=news&query={}&sm=tab_pge&sort=1&photo=0&pd=3&ds={}&de={}&nso={}&qdt=1&start={}"
             
             current_count = 0
@@ -268,7 +270,6 @@ class NewsScraper:
             for page in range(1, max_pages + 1):
                 if current_count >= limit_per_keyword: break
                 
-                # 진행률 표시 (키워드 진행상황 반영)
                 overall_progress = (k_idx / total_keywords) + ((page / max_pages) / total_keywords)
                 progress_bar.progress(min(overall_progress, 1.0))
                 status_text.text(f"🔍 '{keyword}' 검색 중... ({current_count}건 수집)")
@@ -290,7 +291,6 @@ class NewsScraper:
                         title = t_tag.get_text(strip=True)
                         original_link = t_tag.get('href')
                         
-                        # 카드 정보 추출
                         card = None
                         curr = t_tag
                         for _ in range(5):
@@ -326,11 +326,9 @@ class NewsScraper:
                                 paper_info = " (지면)"
                                 is_paper = True
 
-                        # 중복 제거 (이미 수집된 링크면 스킵)
                         if final_link in seen_links: continue
                         seen_links.add(final_link)
                         
-                        # 결과 저장 (source 키워드 추가)
                         all_results.append({
                             'title': f"{title}{paper_info}",
                             'link': final_link,
@@ -338,8 +336,9 @@ class NewsScraper:
                             'is_naver': is_naver,
                             'is_paper': is_paper,
                             'date': article_date,
-                            'source_keyword': keyword, # 어떤 키워드로 찾았는지 저장
-                            'datetime': self.parse_date(article_date) # 정렬용 날짜 객체
+                            'source_keyword': keyword,
+                            'datetime': self.parse_date(article_date),
+                            'rank': rank_score # 정렬을 위한 랭크 점수 저장
                         })
                         current_count += 1
                     time.sleep(0.3)
@@ -348,10 +347,17 @@ class NewsScraper:
         progress_bar.empty()
         status_text.empty()
         
-        # 날짜 기준 내림차순 정렬 (최신순)
-        all_results.sort(key=lambda x: x['datetime'], reverse=True)
+        # [NEW] 이중 정렬 로직
+        # 1차 정렬: 날짜 최신순 (내림차순)
+        # 2차 정렬: 우선순위 랭크 (오름차순, 숫자가 작을수록 위로)
+        # 파이썬 sort는 안정적(Stable)이므로, 날짜순 정렬 후 -> 랭크순 정렬하면
+        # 같은 랭크 내에서는 날짜순이 유지됨.
         
-        # 전체 개수 제한 (max_articles)
+        # 1. 날짜순 정렬 (최신순)
+        all_results.sort(key=lambda x: x['datetime'], reverse=True)
+        # 2. 우선순위별 정렬 (서울교통공사 -> 서울지하철 -> 도시철도)
+        all_results.sort(key=lambda x: x['rank'])
+        
         return all_results[:max_articles]
 
 # ==============================================================================
@@ -359,7 +365,6 @@ class NewsScraper:
 # ==============================================================================
 st.markdown("""
     <style>
-    /* 1. 뉴스 카드 스타일 */
     .news-card { 
         padding: 12px 16px; border-radius: 8px; border-left: 5px solid #007bff; 
         box-shadow: 0 2px 4px rgba(0,0,0,0.08); 
@@ -370,14 +375,12 @@ st.markdown("""
     .news-title { font-size: 15px !important; font-weight: 700; color: #222; margin-bottom: 5px; line-height: 1.4; }
     .news-meta { font-size: 12px !important; color: #666; }
     
-    /* 출처 키워드 뱃지 스타일 */
     .keyword-badge {
         background-color: #e3f2fd; color: #1565c0; 
         padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: 600;
         margin-right: 6px; border: 1px solid #bbdefb;
     }
     
-    /* 2. 모든 버튼 기본 초기화 */
     .stButton > button, .stLinkButton > a, .stButton > button p, .stLinkButton > a p { 
         width: 100% !important; height: 38px !important; 
         font-size: 13px !important; font-weight: 600 !important; 
@@ -386,7 +389,6 @@ st.markdown("""
         font-family: "Source Sans Pro", sans-serif !important;
     }
 
-    /* 3. [상단 툴바] 버튼 스타일 통일 */
     div[data-testid="stVerticalBlockBorderWrapper"] .stButton > button {
         background-color: white !important;
         color: #31333F !important;
@@ -401,7 +403,6 @@ st.markdown("""
         padding: 5px !important; margin-bottom: -10px !important; 
     }
 
-    /* 4. [뉴스 리스트] 버튼 3종 세트 */
     div:not([data-testid="stVerticalBlockBorderWrapper"]) [data-testid="column"]:nth-of-type(1) a {
         border: none !important; background-color: transparent !important; color: #666 !important;
         text-decoration: none !important;
@@ -422,7 +423,6 @@ st.markdown("""
         color: #333 !important; background-color: #f1f3f5 !important;
     }
 
-    /* 간격 조정 */
     div[data-testid="stVerticalBlock"] > div:has(div[data-testid="stVerticalBlockBorderWrapper"]) + div {
         margin-top: -25px !important; 
     }
@@ -440,16 +440,14 @@ for key in ['corp_list', 'rel_list', 'search_results']:
 c1, c2 = st.columns([0.8, 0.2])
 
 with c1: 
-    st.title("Totta Scriptor for web")
+    st.title("🚇 Totta Scriptor for web")
 
-# 우측 상단: 로그아웃 버튼
 with c2:
     st.markdown("<div style='height: 15px;'></div>", unsafe_allow_html=True) 
     if st.button("🔒 로그아웃", key="logout_btn", use_container_width=True):
         st.session_state["logged_in"] = False
         st.rerun()
 
-# 날짜 헤더
 t_date = get_target_date()
 weekdays = ["월", "화", "수", "목", "금", "토", "일"]
 w_str = weekdays[t_date.weekday()]
@@ -565,25 +563,22 @@ st.text_area("스크랩 결과", value=final_output, height=text_height, label_v
 st.divider()
 
 # ==============================================================================
-# [8] 검색 설정 (업그레이드됨: 자동/수동 모드)
+# [8] 검색 설정
 # ==============================================================================
 with st.expander("🔍 뉴스 검색 설정", expanded=True):
-    # [설정 1] 검색 모드 선택 (라디오 버튼)
     mode = st.radio("검색 모드 선택", ["🤖 자동 (서울교통공사 + 서울지하철 + 도시철도)", "⌨️ 수동 입력"], horizontal=True)
-    
     st.markdown("<div style='margin-bottom:10px;'></div>", unsafe_allow_html=True)
 
     col1, col2, col3 = st.columns([2, 1, 1])
     
-    # [설정 2] 모드에 따른 키워드 설정
     if "수동" in mode:
         with col1: 
             user_kw = st.text_input("검색어 입력", value="서울교통공사")
-            search_keywords = [user_kw] # 리스트로 만듦
+            search_keywords = [user_kw]
             log_keyword = user_kw
     else:
         with col1: 
-            st.info("💡 3가지 키워드로 동시에 검색하고 최신순으로 정렬합니다.")
+            st.info("💡 3가지 키워드로 동시에 검색하고 우선순위별로 정렬합니다.")
             search_keywords = ["서울교통공사", "서울지하철", "도시철도"]
             log_keyword = "🤖 자동(복합키워드)"
 
@@ -592,26 +587,24 @@ with st.expander("🔍 뉴스 검색 설정", expanded=True):
     mx = st.slider("최대 기사 수 (전체 합계)", 10, 100, 30)
     
     if st.button("🚀 뉴스 검색 시작", type="primary", use_container_width=True):
-        # 1. 뉴스 검색 (리스트 전달)
         results = NewsScraper().fetch_news(sd, ed, search_keywords, mx)
         
         if not results:
             st.error("검색 결과가 없습니다. 날짜 범위나 키워드를 확인해주세요.")
         else:
             st.session_state.search_results = results
-            # 2. 구글 시트에 로그 기록
             log_to_gsheets(log_keyword, len(results))
             st.rerun()
 
 # ==============================================================================
-# [9] 리스트 출력 함수 (출처 태그 표시 추가)
+# [9] 리스트 출력 함수
 # ==============================================================================
 def display_list(title, items, key_p):
     st.markdown(f'<div class="section-header">{title} ({len(items)}건)</div>', unsafe_allow_html=True)
     
     for i, res in enumerate(items):
         d_val = res.get('date', '')
-        src_kw = res.get('source_keyword', '') # 검색된 키워드 가져오기
+        src_kw = res.get('source_keyword', '')
         
         item_txt = f"ㅇ {res['title']}_{res['press']}\n{res['link']}\n\n"
         
@@ -621,7 +614,6 @@ def display_list(title, items, key_p):
         col_m, col_b = st.columns([0.65, 0.35])
         
         with col_m:
-            # [수정] 출처 키워드 뱃지 추가
             badge_html = f"<span class='keyword-badge'>🔍 {src_kw}</span>" if src_kw else ""
             
             st.markdown(f"""<div class="news-card {bg}">
