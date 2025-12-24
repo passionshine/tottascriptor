@@ -5,8 +5,6 @@ import datetime
 import time
 import re
 import streamlit.components.v1 as components
-import json
-import os
 import smtplib
 from email.mime.text import MIMEText
 
@@ -47,7 +45,7 @@ if not st.session_state["logged_in"]:
     st.stop()
 
 # ==============================================================================
-# [3] 스마트 날짜 계산
+# [2] 스마트 날짜 계산
 # ==============================================================================
 def get_target_date():
     today = datetime.date.today()
@@ -68,7 +66,7 @@ def get_target_date():
     return target
 
 # ==============================================================================
-# [4] 이메일 발송 함수 (Gmail)
+# [3] 이메일 발송 함수 (Gmail)
 # ==============================================================================
 def send_email_gmail(sender_email, sender_pw, receiver_email, subject, content):
     try:
@@ -89,7 +87,7 @@ def send_email_gmail(sender_email, sender_pw, receiver_email, subject, content):
         return False, f"❌ 전송 실패: {e}"
 
 # ==============================================================================
-# [5] 뉴스 스크래퍼
+# [4] 뉴스 스크래퍼
 # ==============================================================================
 class NewsScraper:
     def __init__(self):
@@ -187,7 +185,7 @@ class NewsScraper:
         return all_results
 
 # ==============================================================================
-# [6] UI 설정 및 CSS 스타일링
+# [5] UI 설정 및 CSS 스타일링
 # ==============================================================================
 st.markdown("""
     <style>
@@ -263,17 +261,16 @@ for key in ['corp_list', 'rel_list', 'search_results']:
     if key not in st.session_state: st.session_state[key] = []
 
 # ==============================================================================
-# [7] 메인 UI 구성 (사이드바 제거됨)
+# [6] 메인 UI 구성 (사용량 표시 삭제됨)
 # ==============================================================================
 c1, c2 = st.columns([0.8, 0.2])
 
 with c1: 
     st.title("🚇 Totta Scriptor for web")
 
-# 우측 상단에 로그아웃 버튼 배치
+# [수정됨] 우측 상단: 사용량 표시 제거하고 로그아웃 버튼만 남김
 with c2:
-    current_usage = get_usage_count()
-    st.markdown(f"<div style='text-align:right; font-size:12px; color:#888; margin-bottom:5px;'>🔢 누적 실행: <b>{current_usage}</b>회</div>", unsafe_allow_html=True)
+    st.markdown("<div style='height: 15px;'></div>", unsafe_allow_html=True) # 줄맞춤용 여백
     if st.button("🔒 로그아웃", key="logout_btn", use_container_width=True):
         st.session_state["logged_in"] = False
         st.rerun()
@@ -410,7 +407,7 @@ st.text_area("스크랩 결과", value=final_output, height=text_height, label_v
 st.divider()
 
 # ==============================================================================
-# [8] 검색 설정
+# [7] 검색 설정
 # ==============================================================================
 with st.expander("🔍 뉴스 검색 설정", expanded=True):
     col1, col2, col3 = st.columns([2, 1, 1])
@@ -419,13 +416,13 @@ with st.expander("🔍 뉴스 검색 설정", expanded=True):
     with col3: ed = st.date_input("종료", datetime.date.today())
     mx = st.slider("최대 기사 수", 10, 100, 30)
     
+    # [수정됨] 사용량 카운트 증가 함수 제거
     if st.button("🚀 뉴스 검색 시작", type="primary", use_container_width=True):
-        increment_usage_count()
         st.session_state.search_results = NewsScraper().fetch_news(sd, ed, kw, mx)
         st.rerun()
 
 # ==============================================================================
-# [9] 리스트 출력 함수
+# [8] 리스트 출력 함수
 # ==============================================================================
 def display_list(title, items, key_p):
     st.markdown(f'<div class="section-header">{title} ({len(items)}건)</div>', unsafe_allow_html=True)
@@ -474,4 +471,3 @@ if st.session_state.search_results:
     if p_news: display_list("📰 지면 보도", p_news, "p")
     if n_news: display_list("🟢 네이버 뉴스", n_news, "n")
     if o_news: display_list("🌐 언론사 자체 뉴스", o_news, "o")
-
