@@ -7,7 +7,9 @@ import re
 import streamlit.components.v1 as components
 import smtplib
 from email.mime.text import MIMEText
-import os # 파일 존재 여부 확인용
+import os
+import pandas as pd
+from streamlit_gsheets import GSheetsConnection
 
 # ==============================================================================
 # [0] 페이지 기본 설정
@@ -15,7 +17,7 @@ import os # 파일 존재 여부 확인용
 st.set_page_config(page_title="Totta Scriptor", layout="wide", page_icon="🚇")
 
 # ==============================================================================
-# [1] 로그인(잠금) 시스템 (로고 파일 업로드 방식 적용)
+# [1] 로그인(잠금) 시스템
 # ==============================================================================
 if "logged_in" not in st.session_state:
     st.session_state["logged_in"] = False
@@ -31,9 +33,7 @@ def check_password():
     else:
         st.toast("🚫 비밀번호가 일치하지 않습니다.", icon="🚨")
 
-# --- [로그인 대문 화면 시작] ---
 if not st.session_state["logged_in"]:
-    # 1. 상단 여백
     st.markdown("""
         <style>
         .login-container { margin-top: 10vh; }
@@ -41,69 +41,36 @@ if not st.session_state["logged_in"]:
         <div class='login-container'></div>
         """, unsafe_allow_html=True)
     
-    # 2. 중앙 정렬 레이아웃
     col1, col2, col3 = st.columns([1.5, 2, 1.5])
     
     with col2:
-        # 깔끔한 카드 박스
         with st.container(border=True):
-            # [A] 로고 영역 (업로드 파일 방식)
-            lc1, lc2, lc3 = st.columns([0.5, 3, 0.5]) # 로고 크기 조절을 위한 비율
+            lc1, lc2, lc3 = st.columns([0.5, 3, 0.5])
             with lc2:
-                # logo.png 파일이 있으면 보여주고, 없으면 텍스트로 대체
                 if os.path.exists("logo.png"):
                     st.image("logo.png", use_container_width=True)
                 else:
-                    # 로고 파일을 아직 안 올렸을 때 보여줄 기본 텍스트
-                    st.markdown("<h2 style='text-align: center; color: #2c3e50;'> Totta Scriptor</h2>", unsafe_allow_html=True)
+                    st.markdown("<h1 style='text-align: center; color: #2c3e50;'>🚇 Totta Scriptor</h1>", unsafe_allow_html=True)
             
-            # [B] 환영 문구 영역
             st.markdown("""
                 <div style='text-align: center; margin-bottom: 30px; margin-top: 10px;'>
-                    <p style='color: #7f8c8d; font-size: 15px;'>서울교통공사 뉴스 스크랩 시스템입니다.<br>접속을 위해 비밀번호를 입력해주세요.</p>
+                    <p style='color: #7f8c8d; font-size: 15px;'>안전한 뉴스 스크랩을 위한 공간입니다.<br>접속을 위해 비밀번호를 입력해주세요.</p>
                 </div>
                 """, unsafe_allow_html=True)
 
-            # [C] 입력 필드 및 버튼 영역
             st.text_input("비밀번호", type="password", key="password_input", on_change=check_password, placeholder="비밀번호 입력")
-                # 비밀번호 입력칸 스타일링 (글씨 크기 및 높이 줄임)
-            st.markdown(
-                """
-                <style>
-                /* 비밀번호 입력창 내부의 실제 입력 필드 타겟팅 */
-                .stTextInput input[type="password"] {
-                    font-size: 13px !important;  /* 글씨 크기 (원하는대로 조절 가능) */
-                    height: 32px !important;     /* 입력창 높이 */
-                    min-height: 32px !important; /* 최소 높이 */
-                }
-                /* 입력창을 감싸는 컨테이너 높이도 같이 조절 */
-                .stTextInput > div > div {
-                    height: 32px !important;
-                    min-height: 32px !important;
-                }
-                </style>
-                """,
-                unsafe_allow_html=True
-            )
-
-
             
-            st.markdown("<div style='margin-top: 12px;'></div>", unsafe_allow_html=True)
+            st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
             
             if st.button("로그인", use_container_width=True, type="primary"):
                 check_password()
                 
-            # 하단 저작권 표시
             st.markdown("""
                 <div style='text-align: center; margin-top: 30px; color: #bdc3c7; font-size: 12px;'>
                     © 2025 Totta Scriptor. All rights reserved.
                 </div>
                 """, unsafe_allow_html=True)
-                
-    # 로그인이 안 된 상태면 여기서 코드 실행 중단
     st.stop()
-# --- [로그인 대문 화면 끝] ---
-
 
 # ==============================================================================
 # [2] 스마트 날짜 계산
@@ -127,7 +94,45 @@ def get_target_date():
     return target
 
 # ==============================================================================
-# [3] 이메일 발송 함수 (Gmail)
+# [3] 구글 시트 로그 기록 함수 (NEW)
+# ==============================================================================
+def log_to_gsheets(keyword, count):
+    """구글 시트에 검색 기록을 저장합니다."""
+    try:
+        # 1. 시트 연결 (secrets.toml 정보 사용)
+        conn = st.connection("gsheets", type=GSheetsConnection)
+        
+        # 2. 기존 데이터 읽기 (오류 방지를 위해 5초 캐시)
+        try:
+            existing_data = conn.read(worksheet="Sheet1", usecols=list(range(5)), ttl=5)
+            # 만약 데이터가 비어있으면 초기화
+            if existing_data.empty:
+                 existing_data = pd.DataFrame(columns=["날짜", "시간", "검색어", "결과수", "상태"])
+        except:
+             existing_data = pd.DataFrame(columns=["날짜", "시간", "검색어", "결과수", "상태"])
+
+        # 3. 새 데이터 생성
+        now = datetime.datetime.now()
+        new_row = pd.DataFrame([{
+            "날짜": now.strftime("%Y-%m-%d"),
+            "시간": now.strftime("%H:%M:%S"),
+            "검색어": keyword,
+            "결과수": count,
+            "상태": "성공"
+        }])
+        
+        # 4. 데이터 합치기
+        updated_df = pd.concat([existing_data, new_row], ignore_index=True)
+        
+        # 5. 시트 업데이트
+        conn.update(worksheet="Sheet1", data=updated_df)
+        
+    except Exception as e:
+        # 로그 실패해도 앱은 멈추지 않게 처리
+        print(f"로그 기록 실패: {e}")
+
+# ==============================================================================
+# [4] 이메일 발송 함수
 # ==============================================================================
 def send_email_gmail(sender_email, sender_pw, receiver_email, subject, content):
     try:
@@ -148,7 +153,7 @@ def send_email_gmail(sender_email, sender_pw, receiver_email, subject, content):
         return False, f"❌ 전송 실패: {e}"
 
 # ==============================================================================
-# [4] 뉴스 스크래퍼
+# [5] 뉴스 스크래퍼
 # ==============================================================================
 class NewsScraper:
     def __init__(self):
@@ -246,7 +251,7 @@ class NewsScraper:
         return all_results
 
 # ==============================================================================
-# [5] UI 설정 및 CSS 스타일링
+# [6] UI 설정 및 CSS 스타일링
 # ==============================================================================
 st.markdown("""
     <style>
@@ -286,7 +291,6 @@ st.markdown("""
     }
 
     /* 4. [뉴스 리스트] 버튼 3종 세트 */
-    /* 1번: 원문보기 (Link) */
     div:not([data-testid="stVerticalBlockBorderWrapper"]) [data-testid="column"]:nth-of-type(1) a {
         border: none !important; background-color: transparent !important; color: #666 !important;
         text-decoration: none !important;
@@ -294,14 +298,12 @@ st.markdown("""
     div:not([data-testid="stVerticalBlockBorderWrapper"]) [data-testid="column"]:nth-of-type(1) a:hover {
         text-decoration: underline !important; color: #007bff !important;
     }
-    /* 2번: 공사 기사 (Main) */
     div:not([data-testid="stVerticalBlockBorderWrapper"]) [data-testid="column"]:nth-of-type(2) button {
         border: 1px solid #e0e0e0 !important; background-color: white !important; color: #007bff !important;
     }
     div:not([data-testid="stVerticalBlockBorderWrapper"]) [data-testid="column"]:nth-of-type(2) button:hover {
         border-color: #007bff !important; background-color: #f0f8ff !important; color: #007bff !important;
     }
-    /* 3번: 기타 기사 (Sub) */
     div:not([data-testid="stVerticalBlockBorderWrapper"]) [data-testid="column"]:nth-of-type(3) button {
         border: none !important; background-color: transparent !important; color: #888 !important;
     }
@@ -322,7 +324,7 @@ for key in ['corp_list', 'rel_list', 'search_results']:
     if key not in st.session_state: st.session_state[key] = []
 
 # ==============================================================================
-# [6] 메인 UI 구성
+# [7] 메인 UI 구성
 # ==============================================================================
 c1, c2 = st.columns([0.8, 0.2])
 
@@ -331,7 +333,7 @@ with c1:
 
 # 우측 상단: 로그아웃 버튼
 with c2:
-    st.markdown("<div style='height: 15px;'></div>", unsafe_allow_html=True) # 줄맞춤용 여백
+    st.markdown("<div style='height: 15px;'></div>", unsafe_allow_html=True) 
     if st.button("🔒 로그아웃", key="logout_btn", use_container_width=True):
         st.session_state["logged_in"] = False
         st.rerun()
@@ -377,164 +379,4 @@ def email_dialog(content):
     
     with r_c1:
         receiver_user = st.text_input("받는사람ID", placeholder="userid", label_visibility="collapsed")
-    with r_c2:
-        st.markdown("<div style='text-align:center; padding-top:10px; font-weight:bold;'>@</div>", unsafe_allow_html=True)
-    with r_c3:
-        domains = ["naver.com", "seoulmetro.co.kr",  "gmail.com", "daum.net", "직접입력"]
-        selected_domain = st.selectbox("도메인선택", domains, label_visibility="collapsed")
-
-    if selected_domain == "직접입력":
-        custom_domain = st.text_input("도메인 직접 입력", placeholder="company.com")
-        if receiver_user and custom_domain:
-            receiver_id = f"{receiver_user}@{custom_domain}"
-        else:
-            receiver_id = ""
-    else:
-        if receiver_user:
-            receiver_id = f"{receiver_user}@{selected_domain}"
-        else:
-            receiver_id = ""
-
-    # 3. 메일 제목
-    st.markdown("**메일 제목**")
-    mail_title = st.text_input("메일 제목", value=f"[{t_date.month}/{t_date.day}] 뉴스 스크랩 보고", label_visibility="collapsed")
-    
-    st.markdown("") 
-
-    if st.button("🚀 전송하기", use_container_width=True, type="primary"):
-        if not sender_id or not sender_pw or not receiver_id:
-            st.error("이메일 정보를 모두 입력해주세요.")
-        elif not content.strip():
-            st.warning("보낼 내용이 없습니다.")
-        else:
-            with st.spinner("전송 중..."):
-                success, msg = send_email_gmail(sender_id, sender_pw, receiver_id, mail_title, content)
-                if success:
-                    st.success(msg)
-                    time.sleep(1.5)
-                    st.rerun()
-                else:
-                    st.error(msg)
-
-# --------------------------------------------------------------------------
-# [TOOLBAR] 복사 / 메일 / 초기화 버튼
-# --------------------------------------------------------------------------
-with st.container(border=True):
-    cb1, cb2, cb3 = st.columns(3)
-    
-    # 1. 복사 버튼
-    with cb1:
-        if final_output.strip() != date_header.strip():
-            js_code = f"""
-            <style>
-                body {{ margin: 0; padding: 0; overflow: hidden; }}
-                .custom-btn {{
-                    width: 100%; height: 38px; background-color: white; color: #31333F;
-                    border: 1px solid #e0e0e0; border-radius: 4px; cursor: pointer;
-                    font-size: 13px; font-weight: 600; font-family: "Source Sans Pro", sans-serif;
-                    display: flex; align-items: center; justify-content: center;
-                    box-sizing: border-box; transition: all 0.2s ease;
-                }}
-                .custom-btn:hover {{ border-color: #007bff; color: #007bff; outline: none; }}
-                .custom-btn:active {{ background-color: #f0f7ff; }}
-            </style>
-            <textarea id="copy_target" style="position:absolute;top:-9999px;">{final_output}</textarea>
-            <button class="custom-btn" onclick="copyToClipboard()">📋 텍스트 복사</button>
-            <script>
-                function copyToClipboard() {{
-                    var t = document.getElementById("copy_target");
-                    t.select(); document.execCommand("copy"); alert("✅ 복사되었습니다!");
-                }}
-            </script>
-            """
-            components.html(js_code, height=38)
-        else:
-            st.button("📋 텍스트 복사", disabled=True, use_container_width=True)
-
-    # 2. 메일 보내기 버튼
-    with cb2:
-        if st.button("📧 메일 보내기", use_container_width=True):
-            email_dialog(final_output)
-
-    # 3. 초기화 버튼
-    with cb3:
-        if st.button("🗑️ 전체 초기화", use_container_width=True):
-            st.session_state.corp_list, st.session_state.rel_list = [], []
-            st.rerun()
-
-text_height = max(150, (final_output.count('\n') + 1) * 22)
-st.text_area("스크랩 결과", value=final_output, height=text_height, label_visibility="collapsed")
-
-st.divider()
-
-# ==============================================================================
-# [7] 검색 설정
-# ==============================================================================
-with st.expander("🔍 뉴스 검색 설정", expanded=True):
-    col1, col2, col3 = st.columns([2, 1, 1])
-    with col1: kw = st.text_input("검색어", value="서울교통공사")
-    with col2: sd = st.date_input("시작", datetime.date.today() - datetime.timedelta(days=1))
-    with col3: ed = st.date_input("종료", datetime.date.today())
-    mx = st.slider("최대 기사 수", 10, 100, 30)
-    
-    if st.button("🚀 뉴스 검색 시작", type="primary", use_container_width=True):
-        st.session_state.search_results = NewsScraper().fetch_news(sd, ed, kw, mx)
-        st.rerun()
-
-# ==============================================================================
-# [8] 리스트 출력 함수
-# ==============================================================================
-def display_list(title, items, key_p):
-    st.markdown(f'<div class="section-header">{title} ({len(items)}건)</div>', unsafe_allow_html=True)
-    
-    for i, res in enumerate(items):
-        d_val = res.get('date', '')
-        item_txt = f"ㅇ {res['title']}_{res['press']}\n{res['link']}\n\n"
-        
-        is_scraped = (item_txt in st.session_state.corp_list) or (item_txt in st.session_state.rel_list)
-        bg = "bg-scraped" if is_scraped else ""
-
-        col_m, col_b = st.columns([0.65, 0.35])
-        
-        with col_m:
-            st.markdown(f"""<div class="news-card {bg}">
-                <div class="news-title">{res['title']}</div>
-                <div class="news-meta"><span style="color:#007bff;font-weight:bold;">{d_val}</span> | {res['press']}</div>
-            </div>""", unsafe_allow_html=True)
-        
-        with col_b:
-            b1, b2, b3 = st.columns(3, gap="small")
-            
-            with b1: # 1번: 원문
-                st.link_button("원문보기", res['link'], use_container_width=True)
-            with b2: # 2번: 공사
-                if st.button("공사보도", key=f"c_{key_p}_{i}", use_container_width=True):
-                    if item_txt not in st.session_state.corp_list:
-                        st.session_state.corp_list.append(item_txt)
-                        st.toast("🏢 공사 관련 스크랩 완료!", icon="✅"); time.sleep(0.5); st.rerun()
-                    else:
-                        st.toast("⚠️ 이미 추가된 기사입니다", icon="❗")
-            with b3: # 3번: 기타
-                if st.button("기타보도", key=f"r_{key_p}_{i}", use_container_width=True):
-                    if item_txt not in st.session_state.rel_list:
-                        st.session_state.rel_list.append(item_txt)
-                        st.toast("🚆 유관기관 기타 스크랩 완료!", icon="✅"); time.sleep(0.5); st.rerun()
-                    else:
-                        st.toast("⚠️ 이미 추가된 기사입니다.", icon="❗")
-
-if st.session_state.search_results:
-    res = st.session_state.search_results
-    p_news = [x for x in res if x['is_paper']]
-    n_news = [x for x in res if x['is_naver'] and not x['is_paper']]
-    o_news = [x for x in res if not x['is_naver'] and not x['is_paper']]
-    
-    if p_news: display_list("📰 지면 보도", p_news, "p")
-    if n_news: display_list("🟢 네이버 뉴스", n_news, "n")
-    if o_news: display_list("🌐 언론사 자체 뉴스", o_news, "o")
-
-
-
-
-
-
-
+    with r_
