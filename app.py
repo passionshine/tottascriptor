@@ -513,9 +513,9 @@ def help_dialog():
     * **옵션 (🌐 자체 기사 포함):** **기본적으로 켜져 있습니다.** * 💡 광고성 기사를 줄이기 위해 **'서울교통공사'** 키워드로 검색된 자체 기사만 똑똑하게 골라냅니다.
 
     ### 2. 뉴스 카드 색상 구분
-    * <span style='color:#2e7d32; font-weight:bold;'>■ 초록색</span> : **네이버 뉴스** (댓글/공감 확인 가능)
-    * <span style='color:#007bff; font-weight:bold;'>■ 파란색</span> : **언론사 홈페이지** (Outlink)
-    * <span style='color:black; font-weight:bold; background-color:#eee;'>■ 검정색</span> : **지면 기사** (중요도 높음)
+    * <span style='color:#2e7d32; font-weight:bold;'>■ 초록색</span> : **네이버 뉴스** 
+    * <span style='color:#007bff; font-weight:bold;'>■ 파란색</span> : **언론사 자체 기사** (중요도가 떨어지므로 서울교통공사 키워드만 적용됩니다)
+    * <span style='color:black; font-weight:bold; background-color:#eee;'>■ 검정색</span> : **지면 기사**
     * <span style='color:#adb5bd; font-weight:bold;'>■ 회색</span> : 이미 스크랩 목록에 추가된 기사
 
     ### 3. 스크랩 및 기능
@@ -767,3 +767,4 @@ if st.session_state.search_results:
     if p_news: display_list("📰 지면 보도", p_news, "p")
     if n_news: display_list("🟢 네이버 뉴스", n_news, "n")
     if o_news: display_list("🌐 언론사 자체 뉴스", o_news, "o")
+
