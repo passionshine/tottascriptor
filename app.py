@@ -60,7 +60,7 @@ if not st.session_state["logged_in"]:
                 if os.path.exists("logo.png"):
                     st.image("logo.png", use_container_width=True)
                 else:
-                    st.markdown("<h1 style='text-align: center; color: #2c3e50;'>🚇 Totta Scriptor</h1>", unsafe_allow_html=True)
+                    st.markdown("<h2 style='text-align: center; color: #2c3e50;'>Totta Scriptor</h2>", unsafe_allow_html=True)
             
             st.markdown("""
                 <div style='text-align: center; margin-bottom: 30px; margin-top: 10px;'>
@@ -470,7 +470,7 @@ for key in ['corp_list', 'rel_list', 'search_results']:
 c1, c2 = st.columns([0.8, 0.2])
 
 with c1: 
-    st.title("🚇 Totta Scriptor for web")
+    st.title("Totta Scriptor for web")
 
 # [NEW] 도움말 다이얼로그 함수
 @st.dialog("📖 Totta Scriptor 사용 설명서")
@@ -491,11 +491,10 @@ def help_dialog():
     ### 3. 스크랩 및 기능
     * **공사보도 / 기타보도:** 버튼을 누르면 하단 텍스트 상자에 기사가 추가됩니다.
     * **📋 텍스트 복사:** 스크랩된 전체 내용을 클립보드에 복사합니다.
-    * **📧 메일 보내기:** 본인의 G메일 계정 설정을 통해 결과를 바로 전송합니다.
+    * **📧 메일 보내기:** 메일 주소를 입력하면 결과를 바로 전송합니다.
     
     ### 💡 팁
     * 제목과 언론사가 동일한 중복 기사는 **자동으로 제거**됩니다.
-    * 모든 검색 및 발송 이력은 **구글 시트에 로그**로 남습니다.
     """, unsafe_allow_html=True)
 
 # [NEW] 우측 상단 버튼 배치 (도움말 / 로그아웃)
@@ -566,7 +565,7 @@ def email_dialog(content):
             receiver_id = ""
 
     st.markdown("**메일 제목**")
-    mail_title = st.text_input("메일 제목", value=f"[{t_date.month}/{t_date.day}] 뉴스 스크랩 보고", label_visibility="collapsed")
+    mail_title = st.text_input("메일 제목", value=f"[{t_date.month}/{t_date.day}] 뉴스 스크랩", label_visibility="collapsed")
     
     st.markdown("") 
 
@@ -727,3 +726,4 @@ if st.session_state.search_results:
     if p_news: display_list("📰 지면 보도", p_news, "p")
     if n_news: display_list("🟢 네이버 뉴스", n_news, "n")
     if o_news: display_list("🌐 언론사 자체 뉴스", o_news, "o")
+
