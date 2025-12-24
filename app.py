@@ -348,10 +348,11 @@ with st.container(border=True):
 text_height = max(150, (final_output.count('\n') + 1) * 22)
 st.text_area("스크랩 결과", value=final_output, height=text_height, label_visibility="collapsed")
 
+
 # --- [이메일 전송 섹션 (st.secrets 연동)] ---
 st.divider()
 with st.expander("📧 구글 메일로 결과 보내기", expanded=False):
-    # Streamlit Cloud의 secrets에서 값 가져오기 (없으면 빈칸 처리)
+    # Secrets 가져오기
     try:
         default_id = st.secrets["gmail"]["id"]
         default_pw = st.secrets["gmail"]["pw"]
@@ -360,13 +361,26 @@ with st.expander("📧 구글 메일로 결과 보내기", expanded=False):
         default_pw = ""
 
     c1, c2 = st.columns([1, 1])
+    
     with c1:
-        # secrets 값이 있으면 자동으로 채워짐
-        sender_id = st.text_input("보내는 구글 메일", value=default_id, placeholder="example@gmail.com")
-        sender_pw = st.text_input("구글 앱 비밀번호", value=default_pw, type="password")
+        # [수정] 아이디가 있으면 표시만 하고 수정 불가(disabled), 없으면 입력 가능
+        if default_id:
+            sender_id = st.text_input("보내는 메일", value=default_id, disabled=True)
+        else:
+            sender_id = st.text_input("보내는 구글 메일", placeholder="example@gmail.com")
+            
+        # [수정] 비밀번호가 있으면 아예 숨기고 안내 메시지만 표시
+        if default_pw:
+            sender_pw = default_pw # 변수에는 값 저장
+            st.info("🔒 앱 비밀번호가 안전하게 로드되었습니다.")
+        else:
+            sender_pw = st.text_input("구글 앱 비밀번호", type="password")
+
     with c2:
         receiver_id = st.text_input("받는 사람 이메일", placeholder="boss@company.com")
         mail_title = st.text_input("메일 제목", value=f"[{t_date.month}/{t_date.day}] 뉴스 스크랩 보고")
+
+    if st.button("📩 메일 전송하기", use_container_width=True):
 
     if st.button("📩 메일 전송하기", use_container_width=True):
         if not sender_id or not sender_pw or not receiver_id:
@@ -450,3 +464,4 @@ if st.session_state.search_results:
     if p_news: display_list("📰 지면 보도", p_news, "p")
     if n_news: display_list("🟢 네이버 뉴스", n_news, "n")
     if o_news: display_list("🌐 언론사 자체 뉴스", o_news, "o")
+
