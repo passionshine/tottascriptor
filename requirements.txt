@@ -1,4 +1,7 @@
 streamlit
 cloudscraper
 beautifulsoup4
+
 google-generativeai
+st-gsheets-connection
+pandas
