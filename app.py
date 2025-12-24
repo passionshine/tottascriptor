@@ -11,7 +11,65 @@ import smtplib
 from email.mime.text import MIMEText
 
 # ==============================================================================
-# [0] 사용량 카운트 관리
+# [0] 페이지 기본 설정 (가장 먼저 실행되어야 함)
+# ==============================================================================
+st.set_page_config(page_title="Totta Scriptor", layout="wide", page_icon="🚇")
+
+# ==============================================================================
+# [1] 로그인(잠금) 시스템 구현
+# ==============================================================================
+# 세션 상태 초기화
+if "logged_in" not in st.session_state:
+    st.session_state["logged_in"] = False
+
+def check_password():
+    """비밀번호 확인 함수"""
+    # secrets에 설정된 비번 가져오기 (없으면 기본값 0000)
+    try:
+        correct_password = st.secrets["system"]["password"]
+    except:
+        correct_password = "0000" # 설정 안했을 때 임시 비번
+
+    if st.session_state["password_input"] == correct_password:
+        st.session_state["logged_in"] = True
+    else:
+        st.error("🚫 비밀번호가 틀렸습니다.")
+
+# --- [로그인 대문 화면] ---
+if not st.session_state["logged_in"]:
+    # 화면 중앙 정렬을 위한 여백
+    st.markdown("<br><br><br>", unsafe_allow_html=True)
+    
+    col1, col2, col3 = st.columns([1, 2, 1])
+    
+    with col2:
+        with st.container(border=True):
+            st.markdown("<h1 style='text-align: center;'>🚇 Totta Scriptor</h1>", unsafe_allow_html=True)
+            st.markdown("<p style='text-align: center; color: gray;'>관계자 외 접근 금지 (Authorized Personnel Only)</p>", unsafe_allow_html=True)
+            st.divider()
+            
+            st.text_input("접속 비밀번호를 입력하세요", type="password", key="password_input", on_change=check_password)
+            
+            if st.button("로그인 (Login)", use_container_width=True, type="primary"):
+                check_password()
+                
+    # 로그인이 안 된 상태면 여기서 코드 실행 중단 (뉴스 검색 화면 안 보임)
+    st.stop()
+
+
+# ##############################################################################
+# ▼▼▼▼▼ [여기서부터 인증된 사용자만 볼 수 있는 본문 코드] ▼▼▼▼▼
+# ##############################################################################
+
+# 사이드바에 로그아웃 버튼 추가
+with st.sidebar:
+    st.write(f"✅ 인증됨")
+    if st.button("🔒 로그아웃"):
+        st.session_state["logged_in"] = False
+        st.rerun()
+
+# ==============================================================================
+# [2] 사용량 카운트 관리
 # ==============================================================================
 USAGE_FILE = "usage_log.json"
 
@@ -33,7 +91,7 @@ def increment_usage_count():
     return new_count
 
 # ==============================================================================
-# [1] 스마트 날짜 계산
+# [3] 스마트 날짜 계산
 # ==============================================================================
 def get_target_date():
     today = datetime.date.today()
@@ -54,7 +112,7 @@ def get_target_date():
     return target
 
 # ==============================================================================
-# [2] 이메일 발송 함수 (Gmail)
+# [4] 이메일 발송 함수 (Gmail)
 # ==============================================================================
 def send_email_gmail(sender_email, sender_pw, receiver_email, subject, content):
     try:
@@ -75,7 +133,7 @@ def send_email_gmail(sender_email, sender_pw, receiver_email, subject, content):
         return False, f"❌ 전송 실패: {e}"
 
 # ==============================================================================
-# [3] 뉴스 스크래퍼
+# [5] 뉴스 스크래퍼
 # ==============================================================================
 class NewsScraper:
     def __init__(self):
@@ -173,10 +231,8 @@ class NewsScraper:
         return all_results
 
 # ==============================================================================
-# [4] UI 설정 및 CSS 스타일링
+# [6] UI 설정 및 CSS 스타일링
 # ==============================================================================
-st.set_page_config(page_title="Totta Scriptor for web", layout="wide")
-
 st.markdown("""
     <style>
     /* 1. 뉴스 카드 스타일 */
@@ -251,7 +307,7 @@ for key in ['corp_list', 'rel_list', 'search_results']:
     if key not in st.session_state: st.session_state[key] = []
 
 # ==============================================================================
-# [5] 메인 UI 구성
+# [7] 메인 UI 구성 (뉴스 검색기)
 # ==============================================================================
 c1, c2 = st.columns([0.8, 0.2])
 with c1: st.title("🚇 Totta Scriptor for web")
@@ -286,7 +342,6 @@ def email_dialog(content):
 
     # 1. 보내는 사람 정보
     if has_secrets:
-        # [수정] 성공 메시지 삭제
         sender_id = default_id
         sender_pw = default_pw
     else:
@@ -304,7 +359,7 @@ def email_dialog(content):
     with r_c2:
         st.markdown("<div style='text-align:center; padding-top:10px; font-weight:bold;'>@</div>", unsafe_allow_html=True)
     with r_c3:
-        domains = ["naver.com", "seoulmetro.co.kr", "gmail.com", "daum.net", "직접입력"]
+        domains = ["seoulmetro.co.kr", "naver.com", "gmail.com", "daum.net", "google.com", "직접입력"]
         selected_domain = st.selectbox("도메인선택", domains, label_visibility="collapsed")
 
     if selected_domain == "직접입력":
@@ -392,7 +447,7 @@ st.text_area("스크랩 결과", value=final_output, height=text_height, label_v
 st.divider()
 
 # ==============================================================================
-# [6] 검색 설정
+# [8] 검색 설정
 # ==============================================================================
 with st.expander("🔍 뉴스 검색 설정", expanded=True):
     col1, col2, col3 = st.columns([2, 1, 1])
@@ -407,7 +462,7 @@ with st.expander("🔍 뉴스 검색 설정", expanded=True):
         st.rerun()
 
 # ==============================================================================
-# [7] 리스트 출력 함수
+# [9] 리스트 출력 함수
 # ==============================================================================
 def display_list(title, items, key_p):
     st.markdown(f'<div class="section-header">{title} ({len(items)}건)</div>', unsafe_allow_html=True)
@@ -456,4 +511,3 @@ if st.session_state.search_results:
     if p_news: display_list("📰 지면 보도", p_news, "p")
     if n_news: display_list("🟢 네이버 뉴스", n_news, "n")
     if o_news: display_list("🌐 언론사 자체 뉴스", o_news, "o")
-
