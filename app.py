@@ -153,25 +153,31 @@ st.markdown("""
         box-shadow: 0 2px 4px rgba(0,0,0,0.08); background: white; margin-bottom: 5px;
     }
     .bg-scraped { background: #f8f9fa !important; border-left: 5px solid #adb5bd !important; opacity: 0.7; }
-    .news-title { font-size: 17px !important; font-weight: 700; color: #222; margin-bottom: 5px; line-height: 1.4; }
-    .news-meta { font-size: 15px !important; color: #666; }
+    .news-title { font-size: 15px !important; font-weight: 700; color: #222; margin-bottom: 5px; line-height: 1.4; }
+    .news-meta { font-size: 12px !important; color: #666; }
     
-    /* 버튼 스타일 통일 (일반 버튼 + 링크 버튼) */
-    .stButton > button, .stLinkButton > a { 
+    /* ▼▼▼ [수정됨] 버튼 및 내부 텍스트(p태그) 크기 강제 적용 ▼▼▼ */
+    .stButton > button, .stLinkButton > a,
+    .stButton > button p, .stLinkButton > a p { 
         width: 100% !important; 
         height: 38px !important; 
-        font-size: 4px !important; 
-        font-weight: 600 !important;
+        font-size: 02px !important;  /* 원하는 크기로 조절하세요 */
+        font-weight: 600 !important; 
         padding: 0 !important;
-        display: flex; align-items: center; justify-content: center;
+        display: flex; align-items: center; justify-content: center; 
         border-radius: 4px !important;
     }
+    
     /* 버튼 내부 컨테이너의 패딩 제거 */
     div[data-testid="stVerticalBlockBorderWrapper"] { padding: 5px !important; }
     
     .section-header { font-size: 17px; font-weight: 700; color: #333; margin: 25px 0 10px 0; border-bottom: 2px solid #007bff; display: inline-block; }
     </style>
     """, unsafe_allow_html=True)
+
+
+
+
 
 # 세션 상태 초기화
 for key in ['corp_list', 'rel_list', 'search_results']:
@@ -274,6 +280,7 @@ if st.session_state.search_results:
     if p_news: display_list("📰 지면 보도", p_news, "p")
     if n_news: display_list("🟢 네이버 뉴스", n_news, "n")
     if o_news: display_list("🌐 언론사 자체 뉴스", o_news, "o")
+
 
 
 
