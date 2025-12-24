@@ -37,7 +37,6 @@ if not st.session_state["logged_in"]:
     st.markdown("""
         <style>
         .login-container { margin-top: 10vh; }
-        /* 비밀번호 입력창 스타일링 */
         .stTextInput input[type="password"] {
             font-size: 13px !important;
             height: 32px !important;
@@ -61,7 +60,7 @@ if not st.session_state["logged_in"]:
                 if os.path.exists("logo.png"):
                     st.image("logo.png", use_container_width=True)
                 else:
-                    st.markdown("<h1 style='text-align: center; color: #2c3e50;'>🚇 Totta Scriptor</h1>", unsafe_allow_html=True)
+                    st.markdown("<h2 style='text-align: center; color: #2c3e50;'> Totta Scriptor</h2>", unsafe_allow_html=True)
             
             st.markdown("""
                 <div style='text-align: center; margin-bottom: 30px; margin-top: 10px;'>
@@ -180,7 +179,6 @@ def log_copy_to_gsheets():
         updated_df = pd.concat([existing_data, new_row], ignore_index=True)
         conn.update(worksheet="Sheet1", data=updated_df)
     except Exception as e:
-        # 복사는 UX 흐름을 끊지 않기 위해 에러 출력 생략 또는 콘솔 출력
         print(f"복사 로그 저장 실패: {e}")
 
 # ==============================================================================
@@ -205,7 +203,7 @@ def send_email_gmail(sender_email, sender_pw, receiver_email, subject, content):
         return False, f"❌ 전송 실패: {e}"
 
 # ==============================================================================
-# [5] 뉴스 스크래퍼
+# [5] 뉴스 스크래퍼 (복합 키워드 및 최신순 정렬 지원)
 # ==============================================================================
 class NewsScraper:
     def __init__(self):
@@ -215,92 +213,146 @@ class NewsScraper:
             'Referer': 'https://www.naver.com/'
         }
 
-    def fetch_news(self, start_d, end_d, keyword, max_articles):
+    # 날짜 문자열을 정렬 가능한 datetime 객체로 변환하는 헬퍼 함수
+    def parse_date(self, date_str):
+        now = datetime.datetime.now()
+        try:
+            if "분 전" in date_str:
+                minutes = int(re.search(r'(\d+)', date_str).group(1))
+                return now - datetime.timedelta(minutes=minutes)
+            elif "시간 전" in date_str:
+                hours = int(re.search(r'(\d+)', date_str).group(1))
+                return now - datetime.timedelta(hours=hours)
+            elif "일 전" in date_str:
+                days = int(re.search(r'(\d+)', date_str).group(1))
+                return now - datetime.timedelta(days=days)
+            elif "주 전" in date_str:
+                weeks = int(re.search(r'(\d+)', date_str).group(1))
+                return now - datetime.timedelta(weeks=weeks)
+            else:
+                # 2024.01.01 같은 형식
+                return datetime.datetime.strptime(date_str.replace('.', '-'), "%Y-%m-%d")
+        except:
+            return now - datetime.timedelta(days=365) # 파싱 실패시 아주 옛날로
+
+    def fetch_news(self, start_d, end_d, keywords, max_articles):
+        # keywords가 리스트가 아니면 리스트로 변환
+        if isinstance(keywords, str):
+            keywords = [keywords]
+
         ds, de = start_d.strftime("%Y.%m.%d"), end_d.strftime("%Y.%m.%d")
         nso = f"so:dd,p:from{start_d.strftime('%Y%m%d')}to{end_d.strftime('%Y%m%d')}"
         
         all_results = []
         seen_links = set()
-        query = f'"{keyword}"'
-        max_pages = (max_articles // 10) + 1
         
         status_text = st.empty()
         progress_bar = st.progress(0)
         status_text.text("뉴스 수집 시작...")
 
-        for page in range(1, max_pages + 1):
-            if len(all_results) >= max_articles: break
-            progress_bar.progress(min(page / max_pages, 1.0))
-            status_text.text(f"⏳ {page}/{max_pages}페이지 분석 중... (현재 {len(all_results)}건)")
-            
-            start_index = (page - 1) * 10 + 1
-            url = f"https://search.naver.com/search.naver?where=news&query={query}&sm=tab_pge&sort=1&photo=0&pd=3&ds={ds}&de={de}&nso={nso}&qdt=1&start={start_index}"
-            
-            try:
-                response = self.scraper.get(url, headers=self.headers, timeout=10)
-                if response.status_code != 200: continue
-
-                soup = BeautifulSoup(response.content, 'html.parser')
-                items = soup.select('a[data-heatmap-target=".tit"]') or soup.select('a.news_tit')
-                if not items: break
-
-                for t_tag in items:
-                    if len(all_results) >= max_articles: break
-                    title = t_tag.get_text(strip=True)
-                    original_link = t_tag.get('href')
-                    
-                    card = None
-                    curr = t_tag
-                    for _ in range(5):
-                        if curr.parent:
-                            curr = curr.parent
-                            if curr.select_one(".sds-comps-profile") or curr.select_one(".news_info") or 'bx' in curr.get('class', []):
-                                card = curr
-                                break
-                    
-                    final_link = original_link
-                    is_naver = "n.news.naver.com" in original_link
-                    press_name = "알 수 없음"
-                    paper_info = ""
-                    article_date = ""
-                    is_paper = False
-
-                    if card:
-                        naver_btn = card.select_one('a[href*="n.news.naver.com"]')
-                        if naver_btn:
-                            final_link = naver_btn.get('href')
-                            is_naver = True
-                        
-                        press_el = card.select_one(".sds-comps-profile-info-title-text, .press_name, .info.press")
-                        if press_el: press_name = press_el.get_text(strip=True)
-                        full_text = card.get_text(separator=" ", strip=True)
-                        
-                        date_match = re.search(r'(\d+\s?(?:분|시간|일|주|초)\s?전|방금\s?전)', full_text)
-                        abs_date_match = re.search(r'(\d{4}[\.\-]\d{2}[\.\-]\d{2})', full_text)
-
-                        if date_match: article_date = date_match.group(1)
-                        elif abs_date_match: article_date = abs_date_match.group(1).rstrip('.')
-                        if re.search(r'([A-Za-z]*\d+면)', full_text):
-                            paper_info = " (지면)"
-                            is_paper = True
-
-                    if final_link in seen_links: continue
-                    seen_links.add(final_link)
-                    
-                    all_results.append({
-                        'title': f"{title}{paper_info}",
-                        'link': final_link,
-                        'press': press_name,
-                        'is_naver': is_naver,
-                        'is_paper': is_paper,
-                        'date': article_date
-                    })
-                time.sleep(0.3)
-            except: continue
+        total_keywords = len(keywords)
         
+        # 키워드별로 순회하며 수집
+        for k_idx, keyword in enumerate(keywords):
+            query = f'"{keyword}"'
+            # 키워드가 여러개면 1/N 만큼만 가져오지 않고, 전체 맥스를 유지하되 중복 제거 (비효율적일 수 있으나 정확함)
+            # 여기서는 속도를 위해 키워드별로 max_articles의 60% 정도만 가져와서 합치도록 조정
+            limit_per_keyword = max_articles if total_keywords == 1 else int(max_articles * 0.6)
+            
+            # sort=1 (최신순) 설정 적용
+            base_url = "https://search.naver.com/search.naver?where=news&query={}&sm=tab_pge&sort=1&photo=0&pd=3&ds={}&de={}&nso={}&qdt=1&start={}"
+            
+            current_count = 0
+            max_pages = (limit_per_keyword // 10) + 1
+
+            for page in range(1, max_pages + 1):
+                if current_count >= limit_per_keyword: break
+                
+                # 진행률 표시 (키워드 진행상황 반영)
+                overall_progress = (k_idx / total_keywords) + ((page / max_pages) / total_keywords)
+                progress_bar.progress(min(overall_progress, 1.0))
+                status_text.text(f"🔍 '{keyword}' 검색 중... ({current_count}건 수집)")
+                
+                start_index = (page - 1) * 10 + 1
+                url = base_url.format(query, ds, de, nso, start_index)
+                
+                try:
+                    response = self.scraper.get(url, headers=self.headers, timeout=10)
+                    if response.status_code != 200: continue
+
+                    soup = BeautifulSoup(response.content, 'html.parser')
+                    items = soup.select('a[data-heatmap-target=".tit"]') or soup.select('a.news_tit')
+                    if not items: break
+
+                    for t_tag in items:
+                        if current_count >= limit_per_keyword: break
+                        
+                        title = t_tag.get_text(strip=True)
+                        original_link = t_tag.get('href')
+                        
+                        # 카드 정보 추출
+                        card = None
+                        curr = t_tag
+                        for _ in range(5):
+                            if curr.parent:
+                                curr = curr.parent
+                                if curr.select_one(".sds-comps-profile") or curr.select_one(".news_info") or 'bx' in curr.get('class', []):
+                                    card = curr
+                                    break
+                        
+                        final_link = original_link
+                        is_naver = "n.news.naver.com" in original_link
+                        press_name = "알 수 없음"
+                        paper_info = ""
+                        article_date = ""
+                        is_paper = False
+
+                        if card:
+                            naver_btn = card.select_one('a[href*="n.news.naver.com"]')
+                            if naver_btn:
+                                final_link = naver_btn.get('href')
+                                is_naver = True
+                            
+                            press_el = card.select_one(".sds-comps-profile-info-title-text, .press_name, .info.press")
+                            if press_el: press_name = press_el.get_text(strip=True)
+                            full_text = card.get_text(separator=" ", strip=True)
+                            
+                            date_match = re.search(r'(\d+\s?(?:분|시간|일|주|초)\s?전|방금\s?전)', full_text)
+                            abs_date_match = re.search(r'(\d{4}[\.\-]\d{2}[\.\-]\d{2})', full_text)
+
+                            if date_match: article_date = date_match.group(1)
+                            elif abs_date_match: article_date = abs_date_match.group(1).rstrip('.')
+                            if re.search(r'([A-Za-z]*\d+면)', full_text):
+                                paper_info = " (지면)"
+                                is_paper = True
+
+                        # 중복 제거 (이미 수집된 링크면 스킵)
+                        if final_link in seen_links: continue
+                        seen_links.add(final_link)
+                        
+                        # 결과 저장 (source 키워드 추가)
+                        all_results.append({
+                            'title': f"{title}{paper_info}",
+                            'link': final_link,
+                            'press': press_name,
+                            'is_naver': is_naver,
+                            'is_paper': is_paper,
+                            'date': article_date,
+                            'source_keyword': keyword, # 어떤 키워드로 찾았는지 저장
+                            'datetime': self.parse_date(article_date) # 정렬용 날짜 객체
+                        })
+                        current_count += 1
+                    time.sleep(0.3)
+                except: continue
+
         progress_bar.empty()
         status_text.empty()
-        return all_results
+        
+        # 날짜 기준 내림차순 정렬 (최신순)
+        all_results.sort(key=lambda x: x['datetime'], reverse=True)
+        
+        # 전체 개수 제한 (max_articles)
+        return all_results[:max_articles]
 
 # ==============================================================================
 # [6] UI 설정 및 CSS 스타일링
@@ -317,6 +369,13 @@ st.markdown("""
     .bg-scraped { background: #e9ecef !important; border-left: 5px solid #adb5bd !important; opacity: 0.8; }
     .news-title { font-size: 15px !important; font-weight: 700; color: #222; margin-bottom: 5px; line-height: 1.4; }
     .news-meta { font-size: 12px !important; color: #666; }
+    
+    /* 출처 키워드 뱃지 스타일 */
+    .keyword-badge {
+        background-color: #e3f2fd; color: #1565c0; 
+        padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: 600;
+        margin-right: 6px; border: 1px solid #bbdefb;
+    }
     
     /* 2. 모든 버튼 기본 초기화 */
     .stButton > button, .stLinkButton > a, .stButton > button p, .stLinkButton > a p { 
@@ -381,7 +440,7 @@ for key in ['corp_list', 'rel_list', 'search_results']:
 c1, c2 = st.columns([0.8, 0.2])
 
 with c1: 
-    st.title("🚇 Totta Scriptor for web")
+    st.title("Totta Scriptor for web")
 
 # 우측 상단: 로그아웃 버튼
 with c2:
@@ -399,13 +458,12 @@ date_header = f"<{t_date.month}월 {t_date.day}일({w_str}) 조간 스크랩>"
 final_output = f"{date_header}\n\n[공사 관련 보도]\n" + "".join(st.session_state.corp_list) + "\n[유관기관 관련 등 기타 보도]\n" + "".join(st.session_state.rel_list)
 
 # --------------------------------------------------------------------------
-# [POPUP] 이메일 전송 다이얼로그 (Duplicate ID 에러 해결됨)
+# [POPUP] 이메일 전송 다이얼로그
 # --------------------------------------------------------------------------
 @st.dialog("📧 결과 메일 보내기")
 def email_dialog(content):
     st.caption("아래 정보를 입력하여 뉴스 스크랩 결과를 메일로 전송합니다.")
     
-    # Secrets 가져오기
     try:
         default_id = st.secrets["gmail"]["id"]
         default_pw = st.secrets["gmail"]["pw"]
@@ -415,7 +473,6 @@ def email_dialog(content):
         default_pw = ""
         has_secrets = False
 
-    # 1. 보내는 사람 정보
     if has_secrets:
         sender_id = default_id
         sender_pw = default_pw
@@ -424,7 +481,6 @@ def email_dialog(content):
         sender_id = st.text_input("보내는 구글 메일", placeholder="example@gmail.com", label_visibility="collapsed")
         sender_pw = st.text_input("구글 앱 비밀번호", type="password", label_visibility="collapsed")
 
-    # 2. 받는 사람 정보 (아이디 + 도메인 선택)
     st.markdown("**받는 사람**", help="아이디 입력 후 도메인을 선택하세요.")
     
     r_c1, r_c2, r_c3 = st.columns([3, 0.4, 3.6])
@@ -449,13 +505,11 @@ def email_dialog(content):
         else:
             receiver_id = ""
 
-    # 3. 메일 제목
     st.markdown("**메일 제목**")
     mail_title = st.text_input("메일 제목", value=f"[{t_date.month}/{t_date.day}] 뉴스 스크랩 보고", label_visibility="collapsed")
     
     st.markdown("") 
 
-    # [수정] 버튼에 고유 key 추가하여 에러 방지
     if st.button("🚀 전송하기", key="btn_send_email", use_container_width=True, type="primary"):
         if not sender_id or not sender_pw or not receiver_id:
             st.error("이메일 정보를 모두 입력해주세요.")
@@ -474,25 +528,15 @@ def email_dialog(content):
                     st.error(msg)
 
 # --------------------------------------------------------------------------
-# [TOOLBAR] 복사 / 메일 / 초기화 버튼 (복사 로그 기능 추가)
+# [TOOLBAR] 복사 / 메일 / 초기화 버튼
 # --------------------------------------------------------------------------
 with st.container(border=True):
     cb1, cb2, cb3 = st.columns(3)
     
     with cb1:
-        # 복사 버튼: JavaScript 클릭 시 파이썬 함수 호출이 어려우므로, 
-        # Streamlit의 빈 버튼을 투명하게 덮거나, JavaScript에서 직접 처리는 한계가 있음.
-        # 대신, 사용자가 복사 버튼을 눌렀다고 '가정'하고 이벤트를 감지하는 편법 대신
-        # 별도의 '복사 완료 기록' 버튼을 두거나, 복사 버튼 클릭 시 로그를 남기는 건 까다롭습니다.
-        # 가장 현실적인 대안: "📋 텍스트 복사" 버튼을 누르면 로그를 남기고 -> 자동으로 복사 JS를 실행하는 방식은 Streamlit 구조상 어렵습니다.
-        # 차선책: 버튼을 누르면 "복사 준비됨" 상태로 만들고 로그를 남긴 뒤, 복사 스크립트를 실행합니다.
-        
-        # 여기서는 버튼을 누르면 -> 로그 저장 -> 화면 리로드 -> 복사 실행 순서로 구현합니다.
         if st.button("📋 텍스트 복사", key="btn_copy_text", use_container_width=True):
             if final_output.strip() != date_header.strip():
-                log_copy_to_gsheets() # 로그 저장
-                
-                # 복사 실행 JavaScript
+                log_copy_to_gsheets()
                 js_code = f"""
                 <textarea id="copy_target" style="position:absolute;top:-9999px;">{final_output}</textarea>
                 <script>
@@ -501,7 +545,7 @@ with st.container(border=True):
                     document.execCommand("copy");
                 </script>
                 """
-                components.html(js_code, height=0) # 눈에 안 보이게 실행
+                components.html(js_code, height=0)
                 st.toast("✅ 텍스트가 복사되었습니다!", icon="📋")
             else:
                 st.toast("⚠️ 복사할 내용이 없습니다.", icon="❗")
@@ -521,36 +565,54 @@ st.text_area("스크랩 결과", value=final_output, height=text_height, label_v
 st.divider()
 
 # ==============================================================================
-# [8] 검색 설정
+# [8] 검색 설정 (업그레이드됨: 자동/수동 모드)
 # ==============================================================================
 with st.expander("🔍 뉴스 검색 설정", expanded=True):
+    # [설정 1] 검색 모드 선택 (라디오 버튼)
+    mode = st.radio("검색 모드 선택", ["🤖 자동 (서울교통공사 + 서울지하철 + 도시철도)", "⌨️ 수동 입력"], horizontal=True)
+    
+    st.markdown("<div style='margin-bottom:10px;'></div>", unsafe_allow_html=True)
+
     col1, col2, col3 = st.columns([2, 1, 1])
-    with col1: kw = st.text_input("검색어", value="서울교통공사")
+    
+    # [설정 2] 모드에 따른 키워드 설정
+    if "수동" in mode:
+        with col1: 
+            user_kw = st.text_input("검색어 입력", value="서울교통공사")
+            search_keywords = [user_kw] # 리스트로 만듦
+            log_keyword = user_kw
+    else:
+        with col1: 
+            st.info("💡 3가지 키워드로 동시에 검색하고 최신순으로 정렬합니다.")
+            search_keywords = ["서울교통공사", "서울지하철", "도시철도"]
+            log_keyword = "🤖 자동(복합키워드)"
+
     with col2: sd = st.date_input("시작", datetime.date.today() - datetime.timedelta(days=1))
     with col3: ed = st.date_input("종료", datetime.date.today())
-    mx = st.slider("최대 기사 수", 10, 100, 30)
+    mx = st.slider("최대 기사 수 (전체 합계)", 10, 100, 30)
     
     if st.button("🚀 뉴스 검색 시작", type="primary", use_container_width=True):
-        # 1. 뉴스 검색
-        results = NewsScraper().fetch_news(sd, ed, kw, mx)
+        # 1. 뉴스 검색 (리스트 전달)
+        results = NewsScraper().fetch_news(sd, ed, search_keywords, mx)
         
-        # [제안 반영] 검색 결과가 0건일 때 알림 처리
         if not results:
             st.error("검색 결과가 없습니다. 날짜 범위나 키워드를 확인해주세요.")
         else:
             st.session_state.search_results = results
             # 2. 구글 시트에 로그 기록
-            log_to_gsheets(kw, len(results))
+            log_to_gsheets(log_keyword, len(results))
             st.rerun()
 
 # ==============================================================================
-# [9] 리스트 출력 함수
+# [9] 리스트 출력 함수 (출처 태그 표시 추가)
 # ==============================================================================
 def display_list(title, items, key_p):
     st.markdown(f'<div class="section-header">{title} ({len(items)}건)</div>', unsafe_allow_html=True)
     
     for i, res in enumerate(items):
         d_val = res.get('date', '')
+        src_kw = res.get('source_keyword', '') # 검색된 키워드 가져오기
+        
         item_txt = f"ㅇ {res['title']}_{res['press']}\n{res['link']}\n\n"
         
         is_scraped = (item_txt in st.session_state.corp_list) or (item_txt in st.session_state.rel_list)
@@ -559,24 +621,27 @@ def display_list(title, items, key_p):
         col_m, col_b = st.columns([0.65, 0.35])
         
         with col_m:
+            # [수정] 출처 키워드 뱃지 추가
+            badge_html = f"<span class='keyword-badge'>🔍 {src_kw}</span>" if src_kw else ""
+            
             st.markdown(f"""<div class="news-card {bg}">
-                <div class="news-title">{res['title']}</div>
+                <div class="news-title">{badge_html}{res['title']}</div>
                 <div class="news-meta"><span style="color:#007bff;font-weight:bold;">{d_val}</span> | {res['press']}</div>
             </div>""", unsafe_allow_html=True)
         
         with col_b:
             b1, b2, b3 = st.columns(3, gap="small")
             
-            with b1: # 1번: 원문
+            with b1: 
                 st.link_button("원문보기", res['link'], use_container_width=True)
-            with b2: # 2번: 공사
+            with b2: 
                 if st.button("공사보도", key=f"c_{key_p}_{i}", use_container_width=True):
                     if item_txt not in st.session_state.corp_list:
                         st.session_state.corp_list.append(item_txt)
                         st.toast("🏢 공사 관련 스크랩 완료!", icon="✅"); time.sleep(0.5); st.rerun()
                     else:
                         st.toast("⚠️ 이미 추가된 기사입니다", icon="❗")
-            with b3: # 3번: 기타
+            with b3: 
                 if st.button("기타보도", key=f"r_{key_p}_{i}", use_container_width=True):
                     if item_txt not in st.session_state.rel_list:
                         st.session_state.rel_list.append(item_txt)
