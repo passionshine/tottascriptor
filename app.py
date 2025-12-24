@@ -161,7 +161,7 @@ st.markdown("""
     .stButton > button p, .stLinkButton > a p { 
         width: 100% !important; 
         height: 38px !important; 
-        font-size: 10px !important;  /* 원하는 크기로 조절하세요 */
+        font-size: 13px !important;  /* 원하는 크기로 조절하세요 */
         font-weight: 600 !important; 
         padding: 0 !important;
         display: flex; align-items: center; justify-content: center; 
@@ -280,6 +280,7 @@ if st.session_state.search_results:
     if p_news: display_list("📰 지면 보도", p_news, "p")
     if n_news: display_list("🟢 네이버 뉴스", n_news, "n")
     if o_news: display_list("🌐 언론사 자체 뉴스", o_news, "o")
+
 
 
 
