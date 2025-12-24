@@ -37,7 +37,7 @@ if not st.session_state["logged_in"]:
     with col2:
         with st.container(border=True):
             st.markdown("<h1 style='text-align: center;'>🚇 Totta Scriptor</h1>", unsafe_allow_html=True)
-            st.markdown("<p style='text-align: center; color: gray;'>관계자 외 접근 금지 (Authorized Personnel Only)</p>", unsafe_allow_html=True)
+            st.markdown("<p style='text-align: center; color: gray;'>관계자 외 사용이 제한됩니다. (Authorized Personnel Only)</p>", unsafe_allow_html=True)
             st.divider()
             st.text_input("접속 비밀번호를 입력하세요", type="password", key="password_input", on_change=check_password)
             if st.button("로그인 (Login)", use_container_width=True, type="primary"):
@@ -471,3 +471,4 @@ if st.session_state.search_results:
     if p_news: display_list("📰 지면 보도", p_news, "p")
     if n_news: display_list("🟢 네이버 뉴스", n_news, "n")
     if o_news: display_list("🌐 언론사 자체 뉴스", o_news, "o")
+
