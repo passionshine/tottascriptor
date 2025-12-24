@@ -191,22 +191,17 @@ weekdays = ["월", "화", "수", "목", "금", "토", "일"]
 w_str = weekdays[t_date.weekday()]
 
 # 출력 예시: <12월 23일(화) 조간 스크랩>
-date_header = f"<{t_date.month}월 {t_date.day}일({w_str}) 조간 스크랩>"
+date_header = f"< {t_date.month}월 {t_date.day}일({w_str}) 조간 스크랩 >"
 
 
 
 
 final_output = f"{date_header}\n\n[공사 관련 보도]\n" + "".join(st.session_state.corp_list) + "\n[유관기관 관련 보도]\n" + "".join(st.session_state.rel_list)
 text_height = max(150, (final_output.count('\n') + 1) * 22)
-st.text_area("📋 최종 스크랩 텍스트", value=final_output, height=text_height)
+st.text_area("📋 스크랩 결과", value=final_output, height=text_height)
 
 
-
-
-
-
-
-
+# 복사하기, 초기화 버튼
 
 with st.container(border=True):
     # 반반 비율로 컬럼 나누기
@@ -256,11 +251,9 @@ with st.container(border=True):
 
     with cb2:
         # [2. 초기화 버튼 영역]
-        if st.button("🗑️ 전체 초기화", use_container_width=True):
+        if st.button("🗑️ 초기화", use_container_width=True):
             st.session_state.corp_list, st.session_state.rel_list = [], []
             st.rerun()
-
-# st.divider()
 
 # 2. 검색 설정
 with st.expander("🔍 뉴스 검색 설정", expanded=True):
@@ -328,6 +321,7 @@ if st.session_state.search_results:
     if p_news: display_list("📰 지면 보도", p_news, "p")
     if n_news: display_list("🟢 네이버 뉴스", n_news, "n")
     if o_news: display_list("🌐 언론사 자체 뉴스", o_news, "o")
+
 
 
 
