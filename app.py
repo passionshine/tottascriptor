@@ -60,7 +60,7 @@ if not st.session_state["logged_in"]:
             # [B] 환영 문구 영역
             st.markdown("""
                 <div style='text-align: center; margin-bottom: 30px; margin-top: 10px;'>
-                    <p style='color: #7f8c8d; font-size: 15px;'>서울교통공사 뉴스 스크랩을 위한 시스템입니다.<br>접속을 위해 비밀번호를 입력해주세요.</p>
+                    <p style='color: #7f8c8d; font-size: 15px;'>서울교통공사 뉴스 스크랩 시스템입니다.<br>접속을 위해 비밀번호를 입력해주세요.</p>
                 </div>
                 """, unsafe_allow_html=True)
 
@@ -510,5 +510,6 @@ if st.session_state.search_results:
     if p_news: display_list("📰 지면 보도", p_news, "p")
     if n_news: display_list("🟢 네이버 뉴스", n_news, "n")
     if o_news: display_list("🌐 언론사 자체 뉴스", o_news, "o")
+
 
 
