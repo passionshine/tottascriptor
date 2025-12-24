@@ -37,6 +37,17 @@ if not st.session_state["logged_in"]:
     st.markdown("""
         <style>
         .login-container { margin-top: 10vh; }
+        /* 비밀번호 입력창 스타일링 */
+        .stTextInput input[type="password"] {
+            font-size: 13px !important;
+            height: 32px !important;
+            min-height: 32px !important;
+            padding: 0 10px !important;
+        }
+        .stTextInput > div > div {
+            height: 32px !important;
+            min-height: 32px !important;
+        }
         </style>
         <div class='login-container'></div>
         """, unsafe_allow_html=True)
@@ -50,15 +61,15 @@ if not st.session_state["logged_in"]:
                 if os.path.exists("logo.png"):
                     st.image("logo.png", use_container_width=True)
                 else:
-                    st.markdown("<h2 style='text-align: center; color: #2c3e50;'>Totta Scriptor</h2>", unsafe_allow_html=True)
+                    st.markdown("<h1 style='text-align: center; color: #2c3e50;'>🚇 Totta Scriptor</h1>", unsafe_allow_html=True)
             
             st.markdown("""
                 <div style='text-align: center; margin-bottom: 30px; margin-top: 10px;'>
-                    <p style='color: #7f8c8d; font-size: 15px;'>서울교통공사 뉴스 스크랩 시스템입니다.<br>접속을 위해 비밀번호를 입력해주세요.</p>
+                    <p style='color: #7f8c8d; font-size: 15px;'>안전한 뉴스 스크랩을 위한 공간입니다.<br>접속을 위해 비밀번호를 입력해주세요.</p>
                 </div>
                 """, unsafe_allow_html=True)
 
-            st.text_input("비밀번호", type="password", key="password_input", on_change=check_password, placeholder="비밀번호 입력")
+            st.text_input("비밀번호", type="password", key="password_input", on_change=check_password, placeholder="비밀번호 입력", label_visibility="collapsed")
             
             st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
             
@@ -94,25 +105,19 @@ def get_target_date():
     return target
 
 # ==============================================================================
-# [3] 구글 시트 로그 기록 함수 (NEW)
+# [3] 구글 시트 로그 기록 함수들
 # ==============================================================================
 def log_to_gsheets(keyword, count):
-    """구글 시트에 검색 기록을 저장합니다."""
+    """(기본) 검색 기록을 저장합니다."""
     try:
-        # 1. 시트 연결
         conn = st.connection("gsheets", type=GSheetsConnection)
-        
-        # 2. 기존 데이터 읽기 (없으면 빈 데이터프레임 생성)
         try:
-            # TTL을 0으로 설정해 즉시 갱신
             existing_data = conn.read(worksheet="Sheet1", ttl=0)
             if existing_data is None or existing_data.empty:
                 existing_data = pd.DataFrame(columns=["날짜", "시간", "검색어", "결과수", "상태"])
-        except Exception:
-            # 시트가 비어있거나 읽기 에러 시 초기화
-            existing_data = pd.DataFrame(columns=["날짜", "시간", "검색어", "결과수", "상태"])
+        except:
+             existing_data = pd.DataFrame(columns=["날짜", "시간", "검색어", "결과수", "상태"])
 
-        # 3. 새 데이터 생성
         now = datetime.datetime.now()
         new_row = pd.DataFrame([{
             "날짜": now.strftime("%Y-%m-%d"),
@@ -122,25 +127,15 @@ def log_to_gsheets(keyword, count):
             "상태": "성공"
         }])
         
-        # 4. 데이터 합치기 (빈 컬럼 문제 해결을 위해 sort=False)
         updated_df = pd.concat([existing_data, new_row], ignore_index=True)
-        
-        # 5. 시트 업데이트
         conn.update(worksheet="Sheet1", data=updated_df)
-        
-        # 성공 메시지 (테스트용, 잘 되면 주석 처리하세요)
-        # st.success("📝 로그 저장 완료!")
-        
     except Exception as e:
-        # 에러 내용을 화면에 표시
         st.error(f"⚠️ 구글 시트 저장 실패: {e}")
 
 def log_email_to_gsheets(receiver, subject):
-    """구글 시트에 이메일 발송 기록을 저장합니다."""
+    """(이메일) 발송 기록을 저장합니다."""
     try:
         conn = st.connection("gsheets", type=GSheetsConnection)
-        
-        # 기존 데이터 읽기
         try:
             existing_data = conn.read(worksheet="Sheet1", ttl=0)
             if existing_data is None or existing_data.empty:
@@ -148,22 +143,45 @@ def log_email_to_gsheets(receiver, subject):
         except:
             existing_data = pd.DataFrame(columns=["날짜", "시간", "검색어", "결과수", "상태"])
 
-        # 새 데이터 생성 (이 부분이 다릅니다)
         now = datetime.datetime.now()
         new_row = pd.DataFrame([{
             "날짜": now.strftime("%Y-%m-%d"),
             "시간": now.strftime("%H:%M:%S"),
-            "검색어": f"📧 메일 발송 ({subject})",  # 제목을 괄호 안에 넣음
+            "검색어": f"📧 메일 발송 ({subject})",
             "결과수": 1,
-            "상태": f"To: {receiver}" # 수신자 정보를 상태 칸에 기록
+            "상태": f"To: {receiver}"
         }])
         
         updated_df = pd.concat([existing_data, new_row], ignore_index=True)
         conn.update(worksheet="Sheet1", data=updated_df)
-        
     except Exception as e:
         st.error(f"메일 로그 저장 실패: {e}")
 
+def log_copy_to_gsheets():
+    """(텍스트 복사) 기록을 저장합니다."""
+    try:
+        conn = st.connection("gsheets", type=GSheetsConnection)
+        try:
+            existing_data = conn.read(worksheet="Sheet1", ttl=0)
+            if existing_data is None or existing_data.empty:
+                existing_data = pd.DataFrame(columns=["날짜", "시간", "검색어", "결과수", "상태"])
+        except:
+            existing_data = pd.DataFrame(columns=["날짜", "시간", "검색어", "결과수", "상태"])
+
+        now = datetime.datetime.now()
+        new_row = pd.DataFrame([{
+            "날짜": now.strftime("%Y-%m-%d"),
+            "시간": now.strftime("%H:%M:%S"),
+            "검색어": "📋 텍스트 복사 실행",
+            "결과수": 1,
+            "상태": "클립보드 복사"
+        }])
+        
+        updated_df = pd.concat([existing_data, new_row], ignore_index=True)
+        conn.update(worksheet="Sheet1", data=updated_df)
+    except Exception as e:
+        # 복사는 UX 흐름을 끊지 않기 위해 에러 출력 생략 또는 콘솔 출력
+        print(f"복사 로그 저장 실패: {e}")
 
 # ==============================================================================
 # [4] 이메일 발송 함수
@@ -381,7 +399,7 @@ date_header = f"<{t_date.month}월 {t_date.day}일({w_str}) 조간 스크랩>"
 final_output = f"{date_header}\n\n[공사 관련 보도]\n" + "".join(st.session_state.corp_list) + "\n[유관기관 관련 등 기타 보도]\n" + "".join(st.session_state.rel_list)
 
 # --------------------------------------------------------------------------
-# [POPUP] 이메일 전송 다이얼로그
+# [POPUP] 이메일 전송 다이얼로그 (Duplicate ID 에러 해결됨)
 # --------------------------------------------------------------------------
 @st.dialog("📧 결과 메일 보내기")
 def email_dialog(content):
@@ -437,7 +455,8 @@ def email_dialog(content):
     
     st.markdown("") 
 
-    if st.button("🚀 전송하기", use_container_width=True, type="primary"):
+    # [수정] 버튼에 고유 key 추가하여 에러 방지
+    if st.button("🚀 전송하기", key="btn_send_email", use_container_width=True, type="primary"):
         if not sender_id or not sender_pw or not receiver_id:
             st.error("이메일 정보를 모두 입력해주세요.")
         elif not content.strip():
@@ -447,50 +466,45 @@ def email_dialog(content):
                 success, msg = send_email_gmail(sender_id, sender_pw, receiver_id, mail_title, content)
                 
                 if success:
-                    # ▼▼▼ [여기! 로그 기록 함수 호출 추가] ▼▼▼
                     log_email_to_gsheets(receiver_id, mail_title)
-                    # ▲▲▲ ---------------------------------- ▲▲▲
-                    
                     st.success(msg)
                     time.sleep(1.5)
                     st.rerun()
                 else:
                     st.error(msg)
 
-
 # --------------------------------------------------------------------------
-# [TOOLBAR] 복사 / 메일 / 초기화 버튼
+# [TOOLBAR] 복사 / 메일 / 초기화 버튼 (복사 로그 기능 추가)
 # --------------------------------------------------------------------------
 with st.container(border=True):
     cb1, cb2, cb3 = st.columns(3)
     
     with cb1:
-        if final_output.strip() != date_header.strip():
-            js_code = f"""
-            <style>
-                body {{ margin: 0; padding: 0; overflow: hidden; }}
-                .custom-btn {{
-                    width: 100%; height: 38px; background-color: white; color: #31333F;
-                    border: 1px solid #e0e0e0; border-radius: 4px; cursor: pointer;
-                    font-size: 13px; font-weight: 600; font-family: "Source Sans Pro", sans-serif;
-                    display: flex; align-items: center; justify-content: center;
-                    box-sizing: border-box; transition: all 0.2s ease;
-                }}
-                .custom-btn:hover {{ border-color: #007bff; color: #007bff; outline: none; }}
-                .custom-btn:active {{ background-color: #f0f7ff; }}
-            </style>
-            <textarea id="copy_target" style="position:absolute;top:-9999px;">{final_output}</textarea>
-            <button class="custom-btn" onclick="copyToClipboard()">📋 텍스트 복사</button>
-            <script>
-                function copyToClipboard() {{
+        # 복사 버튼: JavaScript 클릭 시 파이썬 함수 호출이 어려우므로, 
+        # Streamlit의 빈 버튼을 투명하게 덮거나, JavaScript에서 직접 처리는 한계가 있음.
+        # 대신, 사용자가 복사 버튼을 눌렀다고 '가정'하고 이벤트를 감지하는 편법 대신
+        # 별도의 '복사 완료 기록' 버튼을 두거나, 복사 버튼 클릭 시 로그를 남기는 건 까다롭습니다.
+        # 가장 현실적인 대안: "📋 텍스트 복사" 버튼을 누르면 로그를 남기고 -> 자동으로 복사 JS를 실행하는 방식은 Streamlit 구조상 어렵습니다.
+        # 차선책: 버튼을 누르면 "복사 준비됨" 상태로 만들고 로그를 남긴 뒤, 복사 스크립트를 실행합니다.
+        
+        # 여기서는 버튼을 누르면 -> 로그 저장 -> 화면 리로드 -> 복사 실행 순서로 구현합니다.
+        if st.button("📋 텍스트 복사", key="btn_copy_text", use_container_width=True):
+            if final_output.strip() != date_header.strip():
+                log_copy_to_gsheets() # 로그 저장
+                
+                # 복사 실행 JavaScript
+                js_code = f"""
+                <textarea id="copy_target" style="position:absolute;top:-9999px;">{final_output}</textarea>
+                <script>
                     var t = document.getElementById("copy_target");
-                    t.select(); document.execCommand("copy"); alert("✅ 복사되었습니다!");
-                }}
-            </script>
-            """
-            components.html(js_code, height=38)
-        else:
-            st.button("📋 텍스트 복사", disabled=True, use_container_width=True)
+                    t.select();
+                    document.execCommand("copy");
+                </script>
+                """
+                components.html(js_code, height=0) # 눈에 안 보이게 실행
+                st.toast("✅ 텍스트가 복사되었습니다!", icon="📋")
+            else:
+                st.toast("⚠️ 복사할 내용이 없습니다.", icon="❗")
 
     with cb2:
         if st.button("📧 메일 보내기", use_container_width=True):
@@ -519,12 +533,15 @@ with st.expander("🔍 뉴스 검색 설정", expanded=True):
     if st.button("🚀 뉴스 검색 시작", type="primary", use_container_width=True):
         # 1. 뉴스 검색
         results = NewsScraper().fetch_news(sd, ed, kw, mx)
-        st.session_state.search_results = results
         
-        # 2. 구글 시트에 로그 기록
-        log_to_gsheets(kw, len(results))
-        
-        st.rerun()
+        # [제안 반영] 검색 결과가 0건일 때 알림 처리
+        if not results:
+            st.error("검색 결과가 없습니다. 날짜 범위나 키워드를 확인해주세요.")
+        else:
+            st.session_state.search_results = results
+            # 2. 구글 시트에 로그 기록
+            log_to_gsheets(kw, len(results))
+            st.rerun()
 
 # ==============================================================================
 # [9] 리스트 출력 함수
@@ -576,10 +593,3 @@ if st.session_state.search_results:
     if p_news: display_list("📰 지면 보도", p_news, "p")
     if n_news: display_list("🟢 네이버 뉴스", n_news, "n")
     if o_news: display_list("🌐 언론사 자체 뉴스", o_news, "o")
-
-
-
-
-
-
-
