@@ -150,7 +150,7 @@ st.markdown("""
     /* 뉴스 카드 스타일 */
     .news-card { 
         padding: 12px 16px; border-radius: 8px; border-left: 5px solid #007bff; 
-        box-shadow: 0 2px 4px rgba(0,0,0,0.08); background: #f9f9f9; margin-bottom: 5px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.08); background: #f0f8ff; margin-bottom: 5px;
     }
     .bg-scraped { background: #f8f9fa !important; border-left: 5px solid #adb5bd !important; opacity: 0.7; }
     .news-title { font-size: 17px !important; font-weight: 700; color: #222; margin-bottom: 5px; line-height: 1.4; }
@@ -192,10 +192,6 @@ w_str = weekdays[t_date.weekday()]
 
 # 출력 예시: <12월 23일(화) 조간 스크랩>
 date_header = f"< {t_date.month}월 {t_date.day}일({w_str}) 조간 스크랩 >"
-
-
-
-
 final_output = f"{date_header}\n\n[공사 관련 보도]\n" + "".join(st.session_state.corp_list) + "\n[유관기관 관련 보도]\n" + "".join(st.session_state.rel_list)
 text_height = max(150, (final_output.count('\n') + 1) * 22)
 st.text_area("📋 스크랩 결과", value=final_output, height=text_height)
@@ -321,6 +317,7 @@ if st.session_state.search_results:
     if p_news: display_list("📰 지면 보도", p_news, "p")
     if n_news: display_list("🟢 네이버 뉴스", n_news, "n")
     if o_news: display_list("🌐 언론사 자체 뉴스", o_news, "o")
+
 
 
 
