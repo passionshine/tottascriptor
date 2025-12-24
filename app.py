@@ -470,7 +470,7 @@ for key in ['corp_list', 'rel_list', 'search_results']:
 c1, c2 = st.columns([0.8, 0.2])
 
 with c1: 
-    st.markdown("<h3 style='margin-bottom:10px; padding-top:10px; font-size: 26px;'>Totta Scriptor for web</h3>", unsafe_allow_html=True)
+    st.markdown("<h2 style='margin-bottom:10px; padding-top:10px; font-size: 26px;'>Totta Scriptor for web</h2>", unsafe_allow_html=True)
 
 # [NEW] 도움말 다이얼로그 함수
 @st.dialog("📖 Totta Scriptor 사용 설명서")
@@ -726,5 +726,6 @@ if st.session_state.search_results:
     if p_news: display_list("📰 지면 보도", p_news, "p")
     if n_news: display_list("🟢 네이버 뉴스", n_news, "n")
     if o_news: display_list("🌐 언론사 자체 뉴스", o_news, "o")
+
 
 
