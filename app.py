@@ -147,35 +147,53 @@ st.set_page_config(page_title="Totta Scriptor for web", layout="wide")
 
 st.markdown("""
     <style>
-    /* 뉴스 카드 스타일 */
+    /* 1. 뉴스 카드 스타일 (연한 하늘색 배경) */
     .news-card { 
         padding: 12px 16px; border-radius: 8px; border-left: 5px solid #007bff; 
-        box-shadow: 0 2px 4px rgba(0,0,0,0.08); background: #f0f8ff; margin-bottom: 5px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.08); 
+        background: #f0f8ff; /* 연한 하늘색 */
+        margin-bottom: 5px;
     }
-    .bg-scraped { background: #f8f9fa !important; border-left: 5px solid #adb5bd !important; opacity: 0.7; }
-    .news-title { font-size: 17px !important; font-weight: 700; color: #222; margin-bottom: 5px; line-height: 1.4; }
-    .news-meta { font-size: 14px !important; color: #666; }
+    .bg-scraped { background: #e9ecef !important; border-left: 5px solid #adb5bd !important; opacity: 0.8; }
+    .news-title { font-size: 15px !important; font-weight: 700; color: #222; margin-bottom: 5px; line-height: 1.4; }
+    .news-meta { font-size: 12px !important; color: #666; }
     
-    /* ▼▼▼ [수정됨] 버튼 및 내부 텍스트(p태그) 크기 강제 적용 ▼▼▼ */
+    /* 2. 순정 버튼(cb2 및 기타) 스타일 및 파란색 호버링 */
     .stButton > button, .stLinkButton > a,
     .stButton > button p, .stLinkButton > a p { 
         width: 100% !important; 
         height: 38px !important; 
-        font-size: 13px !important;  /* 원하는 크기로 조절하세요 */
-        font-weight: 600 !important; 
+        font-size: 14px !important; 
+        font-weight: 400 !important; 
         padding: 0 !important;
         display: flex; align-items: center; justify-content: center; 
         border-radius: 4px !important;
+        transition: all 0.2s ease !important;
+        background-color: white !important;
+        color: #31333F !important;
+        border: 1px solid #e0e0e0 !important;
+    }
+
+    /* 마우스 올렸을 때 파란색으로 변경 */
+    .stButton > button:hover, .stLinkButton > a:hover {
+        border-color: #007bff !important;
+        color: #007bff !important;
+    }
+
+    /* 3. 둥근 네모(컨테이너) 박스 다이어트 및 밀착 */
+    div[data-testid="stVerticalBlockBorderWrapper"] { 
+        padding: 5px !important; 
+        margin-bottom: -10px !important; 
     }
     
-    /* 버튼 내부 컨테이너의 패딩 제거 */
-    div[data-testid="stVerticalBlockBorderWrapper"] { padding: 5px !important; }
-    
+    /* 툴바 박스와 결과창 사이 간격 제거 */
+    div[data-testid="stVerticalBlock"] > div:has(div[data-testid="stVerticalBlockBorderWrapper"]) + div {
+        margin-top: -25px !important; 
+    }
+
     .section-header { font-size: 17px; font-weight: 700; color: #333; margin: 25px 0 10px 0; border-bottom: 2px solid #007bff; display: inline-block; }
     </style>
     """, unsafe_allow_html=True)
-
-
 
 
 
@@ -201,61 +219,56 @@ st.text_area("📋 스크랩 결과", value=final_output, height=text_height)
 with st.container(border=True):
     # 반반 비율로 컬럼 나누기
     cb1, cb2 = st.columns(2)
-    
     with cb1:
-            # [1. 복사 버튼 영역]
-            if final_output.strip() != date_header.strip():
-                # 순정 버튼과 디자인을 똑같이 맞춘 CSS
-                js_code = f"""
-                <style>
-                    body {{ margin: 0; padding: 0; overflow: hidden; }}
-                    .custom-btn {{
-                        width: 100%; 
-                        height: 38px; 
-                        background-color: white; 
-                        color: #31333F; 
-                        border: 1px solid #e0e0e0; 
-                        border-radius: 4px; 
-                        cursor: pointer;
-                        font-size: 14px; 
-                        font-weight: 400; 
-                        font-family: "Source Sans Pro", sans-serif;
-                        display: flex; 
-                        align-items: center; 
-                        justify-content: center;
-                        box-sizing: border-box;
-                        transition: all 0.2s ease; /* 부드러운 변화 효과 */
-                    }}
-                    /* 마우스를 올렸을 때 (호버링) 효과를 순정 버튼과 동기화 */
-                    .custom-btn:hover {{
-                        border-color: #ff4b4b; /* Streamlit 기본 포인트 컬러 */
-                        color: #ff4b4b;
-                        outline: none;
-                    }}
-                    /* 버튼을 클릭했을 때 효과 */
-                    .custom-btn:active {{
-                        background-color: #ff4b4b;
-                        color: white;
-                    }}
-                </style>
-                
-                <textarea id="copy_target" style="position:absolute;top:-9999px;">{final_output}</textarea>
-                <button class="custom-btn" onclick="copyToClipboard()">
-                    📋 텍스트 복사
-                </button>
-                
-                <script>
-                    function copyToClipboard() {{
-                        var t = document.getElementById("copy_target");
-                        t.select();
-                        document.execCommand("copy");
-                        alert("✅ 복사되었습니다!");
-                    }}
-                </script>
-                """
-                components.html(js_code, height=38)
-            else:
-                st.button("📋 텍스트 복사", disabled=True, use_container_width=True)
+        if final_output.strip() != date_header.strip():
+            js_code = f"""
+            <style>
+                body {{ margin: 0; padding: 0; overflow: hidden; }}
+                .custom-btn {{
+                    width: 100%; 
+                    height: 38px; 
+                    background-color: white; 
+                    color: #31333F; 
+                    border: 1px solid #e0e0e0; 
+                    border-radius: 4px; 
+                    cursor: pointer;
+                    font-size: 14px; 
+                    font-weight: 400; 
+                    font-family: "Source Sans Pro", sans-serif;
+                    display: flex; 
+                    align-items: center; 
+                    justify-content: center;
+                    box-sizing: border-box;
+                    transition: all 0.2s ease;
+                }}
+                /* 호버링 색상을 파란색으로 변경 */
+                .custom-btn:hover {{
+                    border-color: #007bff;
+                    color: #007bff;
+                    outline: none;
+                }}
+                .custom-btn:active {{
+                    background-color: #f0f7ff;
+                }}
+            </style>
+            
+            <textarea id="copy_target" style="position:absolute;top:-9999px;">{final_output}</textarea>
+            <button class="custom-btn" onclick="copyToClipboard()">
+                📋 텍스트 복사
+            </button>
+            
+            <script>
+                function copyToClipboard() {{
+                    var t = document.getElementById("copy_target");
+                    t.select();
+                    document.execCommand("copy");
+                    alert("✅ 복사되었습니다!");
+                }}
+            </script>
+            """
+            components.html(js_code, height=38)
+        else:
+            st.button("📋 텍스트 복사", disabled=True, use_container_width=True)
 
 
     with cb2:
@@ -330,6 +343,7 @@ if st.session_state.search_results:
     if p_news: display_list("📰 지면 보도", p_news, "p")
     if n_news: display_list("🟢 네이버 뉴스", n_news, "n")
     if o_news: display_list("🌐 언론사 자체 뉴스", o_news, "o")
+
 
 
 
