@@ -271,7 +271,7 @@ weekdays = ["월", "화", "수", "목", "금", "토", "일"]
 w_str = weekdays[t_date.weekday()]
 date_header = f"<{t_date.month}월 {t_date.day}일({w_str}) 조간 스크랩>"
 
-final_output = f"{date_header}\n\n[공사 관련 보도]\n" + "".join(st.session_state.corp_list) + "\n[유관기관 관련 보도]\n" + "".join(st.session_state.rel_list)
+final_output = f"{date_header}\n\n[공사 관련 보도]\n" + "".join(st.session_state.corp_list) + "\n[유관기관 관련 등 기타 보도]\n" + "".join(st.session_state.rel_list)
 
 # --- [상단 툴바] 복사 & 초기화 ---
 with st.container(border=True):
@@ -391,5 +391,6 @@ if st.session_state.search_results:
     if p_news: display_list("📰 지면 보도", p_news, "p")
     if n_news: display_list("🟢 네이버 뉴스", n_news, "n")
     if o_news: display_list("🌐 언론사 자체 뉴스", o_news, "o")
+
 
 
