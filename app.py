@@ -155,7 +155,7 @@ class NewsScraper:
         return all_results
 
 # ==============================================================================
-# [3] UI 설정 및 CSS 스타일링 (핵심 수정 부분)
+# [3] UI 설정 및 CSS 스타일링 (충돌 해결 버전)
 # ==============================================================================
 st.set_page_config(page_title="Totta Scriptor for web", layout="wide")
 
@@ -165,66 +165,86 @@ st.markdown("""
     .news-card { 
         padding: 12px 16px; border-radius: 8px; border-left: 5px solid #007bff; 
         box-shadow: 0 2px 4px rgba(0,0,0,0.08); 
-        background: #f0f8ff; /* 연한 하늘색 */
+        background: #f0f8ff; 
         margin-bottom: 5px;
     }
     .bg-scraped { background: #e9ecef !important; border-left: 5px solid #adb5bd !important; opacity: 0.8; }
     .news-title { font-size: 15px !important; font-weight: 700; color: #222; margin-bottom: 5px; line-height: 1.4; }
     .news-meta { font-size: 12px !important; color: #666; }
     
-    /* 2. 전체 버튼 기본 리셋 (크기 및 폰트 통일) */
+    /* 2. 모든 버튼 기본 초기화 (폰트, 크기 통일) */
     .stButton > button, .stLinkButton > a, .stButton > button p, .stLinkButton > a p { 
         width: 100% !important; height: 38px !important; 
         font-size: 13px !important; font-weight: 600 !important; 
         padding: 0 !important; display: flex; align-items: center; justify-content: center; 
         border-radius: 4px !important; transition: all 0.2s ease !important;
-        background-color: white !important; color: #31333F !important;
+        font-family: "Source Sans Pro", sans-serif !important;
     }
 
-    /* 3. [상단 툴바] 복사/초기화 버튼 스타일 동기화 */
-    /* 초기화 버튼(cb2)이 있는 툴바 박스 내부의 버튼만 타겟팅 */
+    /* ------------------------------------------------------------------ */
+    /* [A] 상단 툴바 (복사/초기화) 스타일링 */
+    /* ------------------------------------------------------------------ */
+    /* 초기화 버튼(cb2)은 'border-wrapper' 안에 있습니다. */
     div[data-testid="stVerticalBlockBorderWrapper"] .stButton > button {
-        border: 1px solid #e0e0e0 !important; /* 복사 버튼과 동일한 테두리 색 */
+        background-color: white !important;
+        color: #31333F !important;
+        border: 1px solid #e0e0e0 !important; /* 복사 버튼과 동일한 테두리 */
         box-shadow: none !important;
     }
-    /* 툴바 초기화 버튼 호버링 -> 파란색 */
+    /* 상단 툴바 호버링: 파란색 통일 */
     div[data-testid="stVerticalBlockBorderWrapper"] .stButton > button:hover {
         border-color: #007bff !important;
         color: #007bff !important;
     }
-
-    /* 4. [뉴스 리스트] 버튼 3개 개별 호버링 스타일 */
-    /* 1번: 원문보기 (테두리 없음) */
-    div[data-testid="column"]:nth-of-type(1) a {
-        border: none !important; background-color: transparent !important; color: #666 !important;
-    }
-    div[data-testid="column"]:nth-of-type(1) a:hover {
-        text-decoration: underline; color: #007bff !important; /* 밑줄 + 파란글씨 */
-    }
-
-    /* 2번: 공사 기사 (테두리 있음, 메인) */
-    div[data-testid="column"]:nth-of-type(2) button {
-        border: 1px solid #e0e0e0 !important; color: #007bff !important;
-    }
-    div[data-testid="column"]:nth-of-type(2) button:hover {
-        border-color: #007bff !important; 
-        background-color: #f0f8ff !important; /* 연한 하늘색 배경 */
-        color: #007bff !important;
-    }
-
-    /* 3번: 기타 기사 (테두리 없음, 서브) */
-    div[data-testid="column"]:nth-of-type(3) button {
-        border: none !important; background-color: transparent !important; color: #888 !important;
-    }
-    div[data-testid="column"]:nth-of-type(3) button:hover {
-        color: #333 !important; /* 진한 회색 글씨 */
-        background-color: #f1f3f5 !important; /* 연한 회색 배경 */
-    }
-
-    /* 5. 툴바 박스 다이어트 */
+    /* 툴바 박스 여백 제거 */
     div[data-testid="stVerticalBlockBorderWrapper"] { 
         padding: 5px !important; margin-bottom: -10px !important; 
     }
+
+    /* ------------------------------------------------------------------ */
+    /* [B] 뉴스 리스트 버튼 3종 세트 스타일링 */
+    /* (툴바 안에 있지 않은 버튼들만 타겟팅하기 위해 :not 사용) */
+    /* ------------------------------------------------------------------ */
+    
+    /* 1번: 원문보기 (Link) -> 테두리 없음 */
+    div:not([data-testid="stVerticalBlockBorderWrapper"]) [data-testid="column"]:nth-of-type(1) a {
+        border: none !important; 
+        background-color: transparent !important; 
+        color: #666 !important;
+        text-decoration: none !important;
+    }
+    /* 1번 호버: 밑줄 + 파란 글씨 */
+    div:not([data-testid="stVerticalBlockBorderWrapper"]) [data-testid="column"]:nth-of-type(1) a:hover {
+        text-decoration: underline !important; 
+        color: #007bff !important;
+    }
+
+    /* 2번: 공사 기사 (Main Button) -> 연한 회색 테두리 */
+    div:not([data-testid="stVerticalBlockBorderWrapper"]) [data-testid="column"]:nth-of-type(2) button {
+        border: 1px solid #e0e0e0 !important; 
+        background-color: white !important;
+        color: #007bff !important; /* 평소에도 파란 글씨 강조 */
+    }
+    /* 2번 호버: 파란 테두리 + 연한 파란 배경 */
+    div:not([data-testid="stVerticalBlockBorderWrapper"]) [data-testid="column"]:nth-of-type(2) button:hover {
+        border-color: #007bff !important; 
+        background-color: #f0f8ff !important; 
+        color: #007bff !important;
+    }
+
+    /* 3번: 기타 기사 (Sub Button) -> 테두리 없음 */
+    div:not([data-testid="stVerticalBlockBorderWrapper"]) [data-testid="column"]:nth-of-type(3) button {
+        border: none !important; 
+        background-color: transparent !important; 
+        color: #888 !important;
+    }
+    /* 3번 호버: 진한 회색 글씨 + 연한 회색 배경 */
+    div:not([data-testid="stVerticalBlockBorderWrapper"]) [data-testid="column"]:nth-of-type(3) button:hover {
+        color: #333 !important; 
+        background-color: #f1f3f5 !important;
+    }
+
+    /* 결과창과 툴바 사이 간격 조정 */
     div[data-testid="stVerticalBlock"] > div:has(div[data-testid="stVerticalBlockBorderWrapper"]) + div {
         margin-top: -25px !important; 
     }
@@ -260,23 +280,24 @@ with st.container(border=True):
     # 1. 복사 버튼 (HTML/JS)
     with cb1:
         if final_output.strip() != date_header.strip():
-            # 초기화 버튼(cb2) 스타일과 100% 일치시키는 CSS
+            # [중요] 초기화 버튼(cb2) 스타일과 100% 일치시키는 CSS 정의
             js_code = f"""
             <style>
                 body {{ margin: 0; padding: 0; overflow: hidden; }}
                 .custom-btn {{
                     width: 100%; height: 38px; 
-                    background-color: white; color: #31333F;
-                    border: 1px solid #e0e0e0; /* 테두리 색상 통일 */
+                    background-color: white; 
+                    color: #31333F;
+                    border: 1px solid #e0e0e0; /* 초기화 버튼과 동일한 색상 */
                     border-radius: 4px; 
                     cursor: pointer;
-                    font-size: 13px; font-weight: 600; /* 폰트 통일 */
+                    font-size: 13px; font-weight: 600; 
                     font-family: "Source Sans Pro", sans-serif;
                     display: flex; align-items: center; justify-content: center;
                     box-sizing: border-box; 
                     transition: all 0.2s ease;
                 }}
-                /* 호버링: 파란색 (#007bff) */
+                /* 호버링: 파란색 (#007bff) - 초기화 버튼과 동일 */
                 .custom-btn:hover {{ border-color: #007bff; color: #007bff; outline: none; }}
                 .custom-btn:active {{ background-color: #f0f7ff; }}
             </style>
@@ -320,7 +341,7 @@ with st.expander("🔍 뉴스 검색 설정", expanded=True):
         st.rerun()
 
 # ==============================================================================
-# [6] 리스트 출력 함수 (개별 스타일 적용됨)
+# [6] 리스트 출력 함수
 # ==============================================================================
 def display_list(title, items, key_p):
     st.markdown(f'<div class="section-header">{title} ({len(items)}건)</div>', unsafe_allow_html=True)
@@ -341,18 +362,19 @@ def display_list(title, items, key_p):
             </div>""", unsafe_allow_html=True)
         
         with col_b:
+            # gap="small"로 버튼 간격 조정
             b1, b2, b3 = st.columns(3, gap="small")
             
-            with b1: # 테두리 없음, 밑줄 호버
+            with b1: # 1번: 원문 (링크)
                 st.link_button("원문", res['link'], use_container_width=True)
-            with b2: # 파란 테두리, 파란 배경 호버
+            with b2: # 2번: 공사 (버튼)
                 if st.button("공사", key=f"c_{key_p}_{i}", use_container_width=True):
                     if item_txt not in st.session_state.corp_list:
                         st.session_state.corp_list.append(item_txt)
                         st.toast("🏢 공사 스크랩!", icon="✅"); time.sleep(0.5); st.rerun()
                     else:
                         st.toast("⚠️ 이미 있음", icon="❗")
-            with b3: # 테두리 없음, 회색 배경 호버
+            with b3: # 3번: 기타 (버튼)
                 if st.button("기타", key=f"r_{key_p}_{i}", use_container_width=True):
                     if item_txt not in st.session_state.rel_list:
                         st.session_state.rel_list.append(item_txt)
