@@ -260,7 +260,7 @@ with st.container(border=True):
             st.session_state.corp_list, st.session_state.rel_list = [], []
             st.rerun()
 
-st.divider()
+# st.divider()
 
 # 2. 검색 설정
 with st.expander("🔍 뉴스 검색 설정", expanded=True):
@@ -328,6 +328,7 @@ if st.session_state.search_results:
     if p_news: display_list("📰 지면 보도", p_news, "p")
     if n_news: display_list("🟢 네이버 뉴스", n_news, "n")
     if o_news: display_list("🌐 언론사 자체 뉴스", o_news, "o")
+
 
 
 
