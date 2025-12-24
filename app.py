@@ -14,7 +14,7 @@ from email.mime.text import MIMEText
 st.set_page_config(page_title="Totta Scriptor", layout="wide", page_icon="🚇")
 
 # ==============================================================================
-# [1] 로그인(잠금) 시스템
+# [1] 로그인(잠금) 시스템 (구글 스타일 대문 적용)
 # ==============================================================================
 if "logged_in" not in st.session_state:
     st.session_state["logged_in"] = False
@@ -28,21 +28,59 @@ def check_password():
     if st.session_state["password_input"] == correct_password:
         st.session_state["logged_in"] = True
     else:
-        st.error("🚫 비밀번호가 틀렸습니다.")
+        st.toast("🚫 비밀번호가 일치하지 않습니다.", icon="🚨")
 
-# --- [로그인 대문] ---
+# --- [로그인 대문 화면 시작] ---
 if not st.session_state["logged_in"]:
-    st.markdown("<br><br><br>", unsafe_allow_html=True)
-    col1, col2, col3 = st.columns([1, 2, 1])
+    # 1. 수직 중앙 정렬을 위한 상단 여백 확보
+    st.markdown("""
+        <style>
+        .login-container {
+            margin-top: 10vh; /* 화면 상단에서 10% 내려옴 */
+        }
+        </style>
+        <div class='login-container'></div>
+        """, unsafe_allow_html=True)
+    
+    # 2. 수평 중앙 정렬을 위한 컬럼 분할 (좌우 여백 줌)
+    col1, col2, col3 = st.columns([1.5, 2, 1.5])
+    
     with col2:
+        # 구글 스타일의 깔끔한 카드 박스
         with st.container(border=True):
-            st.markdown("<h1 style='text-align: center;'>🚇 Totta Scriptor</h1>", unsafe_allow_html=True)
-            st.markdown("<p style='text-align: center; color: gray;'>관계자 외 사용이 제한됩니다. (Authorized Personnel Only)</p>", unsafe_allow_html=True)
-            st.divider()
-            st.text_input("접속 비밀번호를 입력하세요", type="password", key="password_input", on_change=check_password)
-            if st.button("로그인 (Login)", use_container_width=True, type="primary"):
+            # [A] 로고 영역 (내부 컬럼으로 중앙 정렬)
+            lc1, lc2, lc3 = st.columns([1, 3, 1])
+            with lc2:
+                # 서울교통공사 공식 투명 로고 URL 사용
+                st.image("https://www.seoulmetro.co.kr/kr/images/common/logo.png", use_container_width=True)
+            
+            # [B] 환영 문구 영역
+            st.markdown("""
+                <div style='text-align: center; margin-bottom: 30px;'>
+                    <h2 style='color: #2c3e50; margin-bottom: 10px;'>Totta Scriptor</h2>
+                    <p style='color: #7f8c8d; font-size: 15px;'>안전한 뉴스 스크랩을 위한 공간입니다.<br>접속을 위해 비밀번호를 입력해주세요.</p>
+                </div>
+                """, unsafe_allow_html=True)
+
+            # [C] 입력 필드 및 버튼 영역
+            st.text_input("비밀번호", type="password", key="password_input", on_change=check_password, placeholder="비밀번호 입력")
+            
+            st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True) # 버튼 간격
+            
+            if st.button("로그인", use_container_width=True, type="primary"):
                 check_password()
+                
+            # 하단 저작권 표시 (선택사항)
+            st.markdown("""
+                <div style='text-align: center; margin-top: 30px; color: #bdc3c7; font-size: 12px;'>
+                    © 2025 Totta Scriptor. All rights reserved.
+                </div>
+                """, unsafe_allow_html=True)
+                
+    # 로그인이 안 된 상태면 여기서 코드 실행 중단
     st.stop()
+# --- [로그인 대문 화면 끝] ---
+
 
 # ==============================================================================
 # [2] 스마트 날짜 계산
@@ -261,14 +299,14 @@ for key in ['corp_list', 'rel_list', 'search_results']:
     if key not in st.session_state: st.session_state[key] = []
 
 # ==============================================================================
-# [6] 메인 UI 구성 (사용량 표시 삭제됨)
+# [6] 메인 UI 구성
 # ==============================================================================
 c1, c2 = st.columns([0.8, 0.2])
 
 with c1: 
     st.title("🚇 Totta Scriptor for web")
 
-# [수정됨] 우측 상단: 사용량 표시 제거하고 로그아웃 버튼만 남김
+# 우측 상단: 로그아웃 버튼
 with c2:
     st.markdown("<div style='height: 15px;'></div>", unsafe_allow_html=True) # 줄맞춤용 여백
     if st.button("🔒 로그아웃", key="logout_btn", use_container_width=True):
@@ -416,7 +454,6 @@ with st.expander("🔍 뉴스 검색 설정", expanded=True):
     with col3: ed = st.date_input("종료", datetime.date.today())
     mx = st.slider("최대 기사 수", 10, 100, 30)
     
-    # [수정됨] 사용량 카운트 증가 함수 제거
     if st.button("🚀 뉴스 검색 시작", type="primary", use_container_width=True):
         st.session_state.search_results = NewsScraper().fetch_news(sd, ed, kw, mx)
         st.rerun()
@@ -471,4 +508,3 @@ if st.session_state.search_results:
     if p_news: display_list("📰 지면 보도", p_news, "p")
     if n_news: display_list("🟢 네이버 뉴스", n_news, "n")
     if o_news: display_list("🌐 언론사 자체 뉴스", o_news, "o")
-
