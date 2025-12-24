@@ -55,7 +55,7 @@ if not st.session_state["logged_in"]:
                     st.image("logo.png", use_container_width=True)
                 else:
                     # 로고 파일을 아직 안 올렸을 때 보여줄 기본 텍스트
-                    st.markdown("<h1 style='text-align: center; color: #2c3e50;'>🚇 Totta Scriptor</h1>", unsafe_allow_html=True)
+                    st.markdown("<h2 style='text-align: center; color: #2c3e50;'> Totta Scriptor</h2>", unsafe_allow_html=True)
             
             # [B] 환영 문구 영역
             st.markdown("""
@@ -510,3 +510,4 @@ if st.session_state.search_results:
     if p_news: display_list("📰 지면 보도", p_news, "p")
     if n_news: display_list("🟢 네이버 뉴스", n_news, "n")
     if o_news: display_list("🌐 언론사 자체 뉴스", o_news, "o")
+
