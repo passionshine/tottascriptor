@@ -488,7 +488,7 @@ with st.expander("🔍 뉴스 검색 설정", expanded=True):
         # 2. 구글 시트에 로그 기록
         log_to_gsheets(kw, len(results))
         
-        # st.rerun()
+        st.rerun()
 
 # ==============================================================================
 # [9] 리스트 출력 함수
@@ -540,6 +540,7 @@ if st.session_state.search_results:
     if p_news: display_list("📰 지면 보도", p_news, "p")
     if n_news: display_list("🟢 네이버 뉴스", n_news, "n")
     if o_news: display_list("🌐 언론사 자체 뉴스", o_news, "o")
+
 
 
 
