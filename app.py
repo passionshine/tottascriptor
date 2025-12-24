@@ -135,6 +135,36 @@ def log_to_gsheets(keyword, count):
         # 에러 내용을 화면에 표시
         st.error(f"⚠️ 구글 시트 저장 실패: {e}")
 
+def log_email_to_gsheets(receiver, subject):
+    """구글 시트에 이메일 발송 기록을 저장합니다."""
+    try:
+        conn = st.connection("gsheets", type=GSheetsConnection)
+        
+        # 기존 데이터 읽기
+        try:
+            existing_data = conn.read(worksheet="Sheet1", ttl=0)
+            if existing_data is None or existing_data.empty:
+                existing_data = pd.DataFrame(columns=["날짜", "시간", "검색어", "결과수", "상태"])
+        except:
+            existing_data = pd.DataFrame(columns=["날짜", "시간", "검색어", "결과수", "상태"])
+
+        # 새 데이터 생성 (이 부분이 다릅니다)
+        now = datetime.datetime.now()
+        new_row = pd.DataFrame([{
+            "날짜": now.strftime("%Y-%m-%d"),
+            "시간": now.strftime("%H:%M:%S"),
+            "검색어": f"📧 메일 발송 ({subject})",  # 제목을 괄호 안에 넣음
+            "결과수": 1,
+            "상태": f"To: {receiver}" # 수신자 정보를 상태 칸에 기록
+        }])
+        
+        updated_df = pd.concat([existing_data, new_row], ignore_index=True)
+        conn.update(worksheet="Sheet1", data=updated_df)
+        
+    except Exception as e:
+        st.error(f"메일 로그 저장 실패: {e}")
+
+
 # ==============================================================================
 # [4] 이메일 발송 함수
 # ==============================================================================
@@ -422,6 +452,29 @@ def email_dialog(content):
                 else:
                     st.error(msg)
 
+
+
+    if st.button("🚀 전송하기", use_container_width=True, type="primary"):
+        if not sender_id or not sender_pw or not receiver_id:
+            st.error("이메일 정보를 모두 입력해주세요.")
+        elif not content.strip():
+            st.warning("보낼 내용이 없습니다.")
+        else:
+            with st.spinner("전송 중..."):
+                success, msg = send_email_gmail(sender_id, sender_pw, receiver_id, mail_title, content)
+                
+                if success:
+                    # ▼▼▼ [여기! 로그 기록 함수 호출 추가] ▼▼▼
+                    log_email_to_gsheets(receiver_id, mail_title)
+                    # ▲▲▲ ---------------------------------- ▲▲▲
+                    
+                    st.success(msg)
+                    time.sleep(1.5)
+                    st.rerun()
+                else:
+                    st.error(msg)
+
+
 # --------------------------------------------------------------------------
 # [TOOLBAR] 복사 / 메일 / 초기화 버튼
 # --------------------------------------------------------------------------
@@ -540,6 +593,7 @@ if st.session_state.search_results:
     if p_news: display_list("📰 지면 보도", p_news, "p")
     if n_news: display_list("🟢 네이버 뉴스", n_news, "n")
     if o_news: display_list("🌐 언론사 자체 뉴스", o_news, "o")
+
 
 
 
