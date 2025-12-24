@@ -54,7 +54,7 @@ def get_target_date():
     return target
 
 # ==============================================================================
-# [2] 이메일 발송 함수 (Gmail 전용)
+# [2] 이메일 발송 함수 (Gmail)
 # ==============================================================================
 def send_email_gmail(sender_email, sender_pw, receiver_email, subject, content):
     try:
@@ -63,12 +63,10 @@ def send_email_gmail(sender_email, sender_pw, receiver_email, subject, content):
         msg['From'] = sender_email
         msg['To'] = receiver_email
 
-        # 구글 SMTP 서버 연결 (587 포트 / TLS)
         smtp = smtplib.SMTP("smtp.gmail.com", 587)
         smtp.ehlo()
-        smtp.starttls()  # 보안 연결
+        smtp.starttls()
         
-        # 로그인 및 전송
         smtp.login(sender_email, sender_pw)
         smtp.sendmail(sender_email, receiver_email, msg.as_string())
         smtp.quit()
@@ -102,7 +100,6 @@ class NewsScraper:
 
         for page in range(1, max_pages + 1):
             if len(all_results) >= max_articles: break
-            
             progress_bar.progress(min(page / max_pages, 1.0))
             status_text.text(f"⏳ {page}/{max_pages}페이지 분석 중... (현재 {len(all_results)}건)")
             
@@ -115,12 +112,10 @@ class NewsScraper:
 
                 soup = BeautifulSoup(response.content, 'html.parser')
                 items = soup.select('a[data-heatmap-target=".tit"]') or soup.select('a.news_tit')
-                
                 if not items: break
 
                 for t_tag in items:
                     if len(all_results) >= max_articles: break
-
                     title = t_tag.get_text(strip=True)
                     original_link = t_tag.get('href')
                     
@@ -148,7 +143,6 @@ class NewsScraper:
                         
                         press_el = card.select_one(".sds-comps-profile-info-title-text, .press_name, .info.press")
                         if press_el: press_name = press_el.get_text(strip=True)
-                        
                         full_text = card.get_text(separator=" ", strip=True)
                         
                         date_match = re.search(r'(\d+\s?(?:분|시간|일|주|초)\s?전|방금\s?전)', full_text)
@@ -156,7 +150,6 @@ class NewsScraper:
 
                         if date_match: article_date = date_match.group(1)
                         elif abs_date_match: article_date = abs_date_match.group(1).rstrip('.')
-                        
                         if re.search(r'([A-Za-z]*\d+면)', full_text):
                             paper_info = " (지면)"
                             is_paper = True
@@ -197,7 +190,7 @@ st.markdown("""
     .news-title { font-size: 15px !important; font-weight: 700; color: #222; margin-bottom: 5px; line-height: 1.4; }
     .news-meta { font-size: 12px !important; color: #666; }
     
-    /* 2. 모든 버튼 기본 초기화 (폰트, 크기 통일) */
+    /* 2. 모든 버튼 기본 초기화 */
     .stButton > button, .stLinkButton > a, .stButton > button p, .stLinkButton > a p { 
         width: 100% !important; height: 38px !important; 
         font-size: 13px !important; font-weight: 600 !important; 
@@ -206,70 +199,46 @@ st.markdown("""
         font-family: "Source Sans Pro", sans-serif !important;
     }
 
-    /* ------------------------------------------------------------------ */
-    /* [A] 상단 툴바 (복사/초기화) 스타일링 */
-    /* ------------------------------------------------------------------ */
-    /* 초기화 버튼(cb2)은 'border-wrapper' 안에 있습니다. */
+    /* 3. [상단 툴바] 복사/메일/초기화 버튼 스타일 통일 */
     div[data-testid="stVerticalBlockBorderWrapper"] .stButton > button {
         background-color: white !important;
         color: #31333F !important;
-        border: 1px solid #e0e0e0 !important; /* 복사 버튼과 동일한 테두리 */
+        border: 1px solid #e0e0e0 !important;
         box-shadow: none !important;
     }
-    /* 상단 툴바 호버링: 파란색 통일 */
     div[data-testid="stVerticalBlockBorderWrapper"] .stButton > button:hover {
         border-color: #007bff !important;
         color: #007bff !important;
     }
-    /* 툴바 박스 여백 제거 */
     div[data-testid="stVerticalBlockBorderWrapper"] { 
         padding: 5px !important; margin-bottom: -10px !important; 
     }
 
-    /* ------------------------------------------------------------------ */
-    /* [B] 뉴스 리스트 버튼 3종 세트 스타일링 */
-    /* (툴바 안에 있지 않은 버튼들만 타겟팅하기 위해 :not 사용) */
-    /* ------------------------------------------------------------------ */
-    
-    /* 1번: 원문보기 (Link) -> 테두리 없음 */
+    /* 4. [뉴스 리스트] 버튼 3종 세트 */
+    /* 1번: 원문보기 (Link) */
     div:not([data-testid="stVerticalBlockBorderWrapper"]) [data-testid="column"]:nth-of-type(1) a {
-        border: none !important; 
-        background-color: transparent !important; 
-        color: #666 !important;
+        border: none !important; background-color: transparent !important; color: #666 !important;
         text-decoration: none !important;
     }
-    /* 1번 호버: 밑줄 + 파란 글씨 */
     div:not([data-testid="stVerticalBlockBorderWrapper"]) [data-testid="column"]:nth-of-type(1) a:hover {
-        text-decoration: underline !important; 
-        color: #007bff !important;
+        text-decoration: underline !important; color: #007bff !important;
     }
-
-    /* 2번: 공사 기사 (Main Button) -> 연한 회색 테두리 */
+    /* 2번: 공사 기사 (Main) */
     div:not([data-testid="stVerticalBlockBorderWrapper"]) [data-testid="column"]:nth-of-type(2) button {
-        border: 1px solid #e0e0e0 !important; 
-        background-color: white !important;
-        color: #007bff !important; /* 평소에도 파란 글씨 강조 */
+        border: 1px solid #e0e0e0 !important; background-color: white !important; color: #007bff !important;
     }
-    /* 2번 호버: 파란 테두리 + 연한 파란 배경 */
     div:not([data-testid="stVerticalBlockBorderWrapper"]) [data-testid="column"]:nth-of-type(2) button:hover {
-        border-color: #007bff !important; 
-        background-color: #f0f8ff !important; 
-        color: #007bff !important;
+        border-color: #007bff !important; background-color: #f0f8ff !important; color: #007bff !important;
     }
-
-    /* 3번: 기타 기사 (Sub Button) -> 테두리 없음 */
+    /* 3번: 기타 기사 (Sub) */
     div:not([data-testid="stVerticalBlockBorderWrapper"]) [data-testid="column"]:nth-of-type(3) button {
-        border: none !important; 
-        background-color: transparent !important; 
-        color: #888 !important;
+        border: none !important; background-color: transparent !important; color: #888 !important;
     }
-    /* 3번 호버: 진한 회색 글씨 + 연한 회색 배경 */
     div:not([data-testid="stVerticalBlockBorderWrapper"]) [data-testid="column"]:nth-of-type(3) button:hover {
-        color: #333 !important; 
-        background-color: #f1f3f5 !important;
+        color: #333 !important; background-color: #f1f3f5 !important;
     }
 
-    /* 결과창과 툴바 사이 간격 조정 */
+    /* 간격 조정 */
     div[data-testid="stVerticalBlock"] > div:has(div[data-testid="stVerticalBlockBorderWrapper"]) + div {
         margin-top: -25px !important; 
     }
@@ -282,7 +251,7 @@ for key in ['corp_list', 'rel_list', 'search_results']:
     if key not in st.session_state: st.session_state[key] = []
 
 # ==============================================================================
-# [5] 메인 UI
+# [5] 메인 UI 구성
 # ==============================================================================
 c1, c2 = st.columns([0.8, 0.2])
 with c1: st.title("🚇 Totta Scriptor for web")
@@ -290,7 +259,7 @@ with c2:
     current_usage = get_usage_count()
     st.markdown(f"<div style='text-align:right; font-size:14px; color:#888; margin-top:20px;'>🔢 누적 실행: <b>{current_usage}</b>회</div>", unsafe_allow_html=True)
 
-# 날짜 헤더 생성
+# 날짜 헤더
 t_date = get_target_date()
 weekdays = ["월", "화", "수", "목", "금", "토", "일"]
 w_str = weekdays[t_date.weekday()]
@@ -298,31 +267,71 @@ date_header = f"<{t_date.month}월 {t_date.day}일({w_str}) 조간 스크랩>"
 
 final_output = f"{date_header}\n\n[공사 관련 보도]\n" + "".join(st.session_state.corp_list) + "\n[유관기관 관련 등 기타 보도]\n" + "".join(st.session_state.rel_list)
 
-# --- [상단 툴바] 복사 & 초기화 ---
-with st.container(border=True):
-    cb1, cb2 = st.columns(2)
+# --------------------------------------------------------------------------
+# [POPUP] 이메일 전송 다이얼로그 함수
+# --------------------------------------------------------------------------
+@st.dialog("📧 결과 메일 보내기")
+def email_dialog(content):
+    st.caption("아래 정보를 입력하여 뉴스 스크랩 결과를 메일로 전송합니다.")
     
-    # 1. 복사 버튼 (HTML/JS)
+    # Secrets 가져오기 (오류 방지 로직)
+    try:
+        default_id = st.secrets["gmail"]["id"]
+        default_pw = st.secrets["gmail"]["pw"]
+        has_secrets = True
+    except:
+        default_id = ""
+        default_pw = ""
+        has_secrets = False
+
+    # 1. 보내는 사람 정보
+    if has_secrets:
+        st.success("🔒 구글 계정 정보가 안전하게 로드되었습니다.")
+        sender_id = default_id
+        sender_pw = default_pw
+    else:
+        sender_id = st.text_input("보내는 구글 메일", placeholder="example@gmail.com")
+        sender_pw = st.text_input("구글 앱 비밀번호", type="password")
+
+    # 2. 받는 사람 및 제목
+    receiver_id = st.text_input("받는 사람 이메일", placeholder="boss@company.com")
+    mail_title = st.text_input("메일 제목", value=f"[{t_date.month}/{t_date.day}] 뉴스 스크랩 보고")
+
+    if st.button("🚀 전송하기", use_container_width=True, type="primary"):
+        if not sender_id or not sender_pw or not receiver_id:
+            st.error("필수 정보를 모두 입력해주세요.")
+        elif not content.strip():
+            st.warning("보낼 내용이 없습니다.")
+        else:
+            with st.spinner("전송 중..."):
+                success, msg = send_email_gmail(sender_id, sender_pw, receiver_id, mail_title, content)
+                if success:
+                    st.success(msg)
+                    time.sleep(1.5)
+                    st.rerun() # 전송 후 닫기
+                else:
+                    st.error(msg)
+
+# --------------------------------------------------------------------------
+# [TOOLBAR] 복사 / 메일 / 초기화 버튼
+# --------------------------------------------------------------------------
+with st.container(border=True):
+    # 컬럼 3개 생성 (비율 1:1:1)
+    cb1, cb2, cb3 = st.columns(3)
+    
+    # 1. 복사 버튼
     with cb1:
         if final_output.strip() != date_header.strip():
-            # [중요] 초기화 버튼(cb2) 스타일과 100% 일치시키는 CSS 정의
             js_code = f"""
             <style>
                 body {{ margin: 0; padding: 0; overflow: hidden; }}
                 .custom-btn {{
-                    width: 100%; height: 38px; 
-                    background-color: white; 
-                    color: #31333F;
-                    border: 1px solid #e0e0e0; /* 초기화 버튼과 동일한 색상 */
-                    border-radius: 4px; 
-                    cursor: pointer;
-                    font-size: 13px; font-weight: 600; 
-                    font-family: "Source Sans Pro", sans-serif;
+                    width: 100%; height: 38px; background-color: white; color: #31333F;
+                    border: 1px solid #e0e0e0; border-radius: 4px; cursor: pointer;
+                    font-size: 13px; font-weight: 600; font-family: "Source Sans Pro", sans-serif;
                     display: flex; align-items: center; justify-content: center;
-                    box-sizing: border-box; 
-                    transition: all 0.2s ease;
+                    box-sizing: border-box; transition: all 0.2s ease;
                 }}
-                /* 호버링: 파란색 (#007bff) - 초기화 버튼과 동일 */
                 .custom-btn:hover {{ border-color: #007bff; color: #007bff; outline: none; }}
                 .custom-btn:active {{ background-color: #f0f7ff; }}
             </style>
@@ -339,62 +348,19 @@ with st.container(border=True):
         else:
             st.button("📋 텍스트 복사", disabled=True, use_container_width=True)
 
-    # 2. 초기화 버튼 (Streamlit Native)
+    # 2. 메일 보내기 버튼 (팝업 호출)
     with cb2:
+        if st.button("📧 메일 보내기", use_container_width=True):
+            email_dialog(final_output)
+
+    # 3. 초기화 버튼
+    with cb3:
         if st.button("🗑️ 전체 초기화", use_container_width=True):
             st.session_state.corp_list, st.session_state.rel_list = [], []
             st.rerun()
 
 text_height = max(150, (final_output.count('\n') + 1) * 22)
 st.text_area("스크랩 결과", value=final_output, height=text_height, label_visibility="collapsed")
-
-
-# --- [이메일 전송 섹션 (st.secrets 연동)] ---
-st.divider()
-with st.expander("📧 구글 메일로 결과 보내기", expanded=False):
-    # Secrets 가져오기
-    try:
-        default_id = st.secrets["gmail"]["id"]
-        default_pw = st.secrets["gmail"]["pw"]
-    except:
-        default_id = ""
-        default_pw = ""
-
-    c1, c2 = st.columns([1, 1])
-    
-    with c1:
-        # [수정] 아이디가 있으면 표시만 하고 수정 불가(disabled), 없으면 입력 가능
-        if default_id:
-            sender_id = st.text_input("보내는 메일", value=default_id, disabled=True)
-        else:
-            sender_id = st.text_input("보내는 구글 메일", placeholder="example@gmail.com")
-            
-        # [수정] 비밀번호가 있으면 아예 숨기고 안내 메시지만 표시
-        if default_pw:
-            sender_pw = default_pw # 변수에는 값 저장
-            st.info("🔒 앱 비밀번호가 안전하게 로드되었습니다.")
-        else:
-            sender_pw = st.text_input("구글 앱 비밀번호", type="password")
-
-    with c2:
-        receiver_id = st.text_input("받는 사람 이메일", placeholder="boss@company.com")
-        mail_title = st.text_input("메일 제목", value=f"[{t_date.month}/{t_date.day}] 뉴스 스크랩 보고")
-
-    if st.button("📩 메일 전송하기", use_container_width=True):
-
-    if st.button("📩 메일 전송하기", use_container_width=True):
-        if not sender_id or not sender_pw or not receiver_id:
-            st.error("이메일 정보와 앱 비밀번호를 입력해주세요.")
-        elif not final_output.strip():
-            st.warning("보낼 내용이 없습니다.")
-        else:
-            with st.spinner("메일 전송 중..."):
-                success, msg = send_email_gmail(sender_id, sender_pw, receiver_id, mail_title, final_output)
-                if success:
-                    st.success(msg)
-                    st.balloons()
-                else:
-                    st.error(msg)
 
 st.divider()
 
@@ -435,19 +401,18 @@ def display_list(title, items, key_p):
             </div>""", unsafe_allow_html=True)
         
         with col_b:
-            # gap="small"로 버튼 간격 조정
             b1, b2, b3 = st.columns(3, gap="small")
             
-            with b1: # 1번: 원문 (링크)
+            with b1: # 1번: 원문
                 st.link_button("원문보기", res['link'], use_container_width=True)
-            with b2: # 2번: 공사 (버튼)
+            with b2: # 2번: 공사
                 if st.button("공사보도", key=f"c_{key_p}_{i}", use_container_width=True):
                     if item_txt not in st.session_state.corp_list:
                         st.session_state.corp_list.append(item_txt)
                         st.toast("🏢 공사 관련 스크랩 완료!", icon="✅"); time.sleep(0.5); st.rerun()
                     else:
                         st.toast("⚠️ 이미 추가된 기사입니다", icon="❗")
-            with b3: # 3번: 기타 (버튼)
+            with b3: # 3번: 기타
                 if st.button("기타보도", key=f"r_{key_p}_{i}", use_container_width=True):
                     if item_txt not in st.session_state.rel_list:
                         st.session_state.rel_list.append(item_txt)
@@ -464,4 +429,3 @@ if st.session_state.search_results:
     if p_news: display_list("📰 지면 보도", p_news, "p")
     if n_news: display_list("🟢 네이버 뉴스", n_news, "n")
     if o_news: display_list("🌐 언론사 자체 뉴스", o_news, "o")
-
