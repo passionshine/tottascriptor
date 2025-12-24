@@ -197,12 +197,6 @@ text_height = max(150, (final_output.count('\n') + 1) * 22)
 st.text_area("📋 스크랩 결과", value=final_output, height=text_height)
 
 
-# 복사하기, 초기화 버튼
-
-with st.container(border=True):
-    # 반반 비율로 컬럼 나누기
-    cb1, cb2 = st.columns(2)
-    
 # [교체용 전체 코드] 복사(cb1)와 초기화(cb2)를 한 줄로 높이 맞춰 정렬
 with st.container(border=True):
     # 반반 비율로 컬럼 나누기
@@ -317,6 +311,7 @@ if st.session_state.search_results:
     if p_news: display_list("📰 지면 보도", p_news, "p")
     if n_news: display_list("🟢 네이버 뉴스", n_news, "n")
     if o_news: display_list("🌐 언론사 자체 뉴스", o_news, "o")
+
 
 
 
