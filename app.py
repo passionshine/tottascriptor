@@ -75,7 +75,6 @@ if not st.session_state["logged_in"]:
                     font-size: 13px !important;  /* 글씨 크기 (원하는대로 조절 가능) */
                     height: 32px !important;     /* 입력창 높이 */
                     min-height: 32px !important; /* 최소 높이 */
-                    padding: 0 10px !important;  /* 내부 여백 */
                 }
                 /* 입력창을 감싸는 컨테이너 높이도 같이 조절 */
                 .stTextInput > div > div {
@@ -532,6 +531,7 @@ if st.session_state.search_results:
     if p_news: display_list("📰 지면 보도", p_news, "p")
     if n_news: display_list("🟢 네이버 뉴스", n_news, "n")
     if o_news: display_list("🌐 언론사 자체 뉴스", o_news, "o")
+
 
 
 
