@@ -445,23 +445,6 @@ def email_dialog(content):
         else:
             with st.spinner("전송 중..."):
                 success, msg = send_email_gmail(sender_id, sender_pw, receiver_id, mail_title, content)
-                if success:
-                    st.success(msg)
-                    time.sleep(1.5)
-                    st.rerun()
-                else:
-                    st.error(msg)
-
-
-
-    if st.button("🚀 전송하기", use_container_width=True, type="primary"):
-        if not sender_id or not sender_pw or not receiver_id:
-            st.error("이메일 정보를 모두 입력해주세요.")
-        elif not content.strip():
-            st.warning("보낼 내용이 없습니다.")
-        else:
-            with st.spinner("전송 중..."):
-                success, msg = send_email_gmail(sender_id, sender_pw, receiver_id, mail_title, content)
                 
                 if success:
                     # ▼▼▼ [여기! 로그 기록 함수 호출 추가] ▼▼▼
@@ -593,6 +576,7 @@ if st.session_state.search_results:
     if p_news: display_list("📰 지면 보도", p_news, "p")
     if n_news: display_list("🟢 네이버 뉴스", n_news, "n")
     if o_news: display_list("🌐 언론사 자체 뉴스", o_news, "o")
+
 
 
 
