@@ -10,6 +10,7 @@ from email.mime.text import MIMEText
 import os
 import pandas as pd
 from streamlit_gsheets import GSheetsConnection
+from streamlit.web.server.websocket_headers import _get_websocket_headers
 
 # ==============================================================================
 # [0] 페이지 기본 설정
@@ -60,11 +61,11 @@ if not st.session_state["logged_in"]:
                 if os.path.exists("logo.png"):
                     st.image("logo.png", use_container_width=True)
                 else:
-                    st.markdown("<h2 style='text-align: center; color: #2c3e50;'>Totta Scriptor</h2>", unsafe_allow_html=True)
+                    st.markdown("<h1 style='text-align: center; color: #2c3e50;'>🚇 Totta Scriptor</h1>", unsafe_allow_html=True)
             
             st.markdown("""
                 <div style='text-align: center; margin-bottom: 30px; margin-top: 10px;'>
-                    <p style='color: #7f8c8d; font-size: 15px;'>서울교통공사 뉴스 스크랩을 위한 시스템입니다.<br>접속을 위해 비밀번호를 입력해주세요.</p>
+                    <p style='color: #7f8c8d; font-size: 15px;'>안전한 뉴스 스크랩을 위한 공간입니다.<br>접속을 위해 비밀번호를 입력해주세요.</p>
                 </div>
                 """, unsafe_allow_html=True)
 
@@ -77,13 +78,13 @@ if not st.session_state["logged_in"]:
                 
             st.markdown("""
                 <div style='text-align: center; margin-top: 30px; color: #bdc3c7; font-size: 12px;'>
-                    © 2026 Totta Scriptor. All rights reserved.
+                    © 2025 Totta Scriptor. All rights reserved.
                 </div>
                 """, unsafe_allow_html=True)
     st.stop()
 
 # ==============================================================================
-# [2] 스마트 날짜 계산
+# [2] 스마트 날짜 계산 & 기기 감지
 # ==============================================================================
 def get_target_date():
     today = datetime.date.today()
@@ -103,11 +104,22 @@ def get_target_date():
         target += datetime.timedelta(days=1)
     return target
 
+# [NEW] 접속 기기(Mobile/PC) 감지 함수
+def get_device_type():
+    try:
+        headers = _get_websocket_headers()
+        if headers is None: return "Unknown"
+        user_agent = headers.get("User-Agent", "").lower()
+        if "mobile" in user_agent or "android" in user_agent or "iphone" in user_agent:
+            return "📱Mobile"
+        return "💻PC"
+    except:
+        return "Unknown"
+
 # ==============================================================================
-# [3] 구글 시트 로그 기록 함수들
+# [3] 구글 시트 로그 기록 함수들 (기기 정보 추가됨)
 # ==============================================================================
 def log_to_gsheets(keyword, count, status="성공"):
-    """(기본) 검색 기록을 저장합니다. status 파라미터로 상태 변경 가능"""
     try:
         conn = st.connection("gsheets", type=GSheetsConnection)
         try:
@@ -117,14 +129,18 @@ def log_to_gsheets(keyword, count, status="성공"):
         except:
              existing_data = pd.DataFrame(columns=["날짜", "시간", "검색어", "결과수", "상태"])
 
-        # 한국 시간(KST) 적용
         now = datetime.datetime.now() + datetime.timedelta(hours=9)
+        device = get_device_type() # 기기 정보 가져오기
+        
+        # 상태 메시지에 기기 정보 추가
+        final_status = f"{status} ({device})"
+
         new_row = pd.DataFrame([{
             "날짜": now.strftime("%Y-%m-%d"),
             "시간": now.strftime("%H:%M:%S"),
             "검색어": keyword,
             "결과수": count,
-            "상태": status
+            "상태": final_status
         }])
         
         updated_df = pd.concat([existing_data, new_row], ignore_index=True)
@@ -133,7 +149,6 @@ def log_to_gsheets(keyword, count, status="성공"):
         st.error(f"⚠️ 구글 시트 저장 실패: {e}")
 
 def log_email_to_gsheets(receiver, subject):
-    """(이메일) 발송 기록을 저장합니다."""
     try:
         conn = st.connection("gsheets", type=GSheetsConnection)
         try:
@@ -144,12 +159,14 @@ def log_email_to_gsheets(receiver, subject):
             existing_data = pd.DataFrame(columns=["날짜", "시간", "검색어", "결과수", "상태"])
 
         now = datetime.datetime.now() + datetime.timedelta(hours=9)
+        device = get_device_type()
+        
         new_row = pd.DataFrame([{
             "날짜": now.strftime("%Y-%m-%d"),
             "시간": now.strftime("%H:%M:%S"),
             "검색어": f"📧 메일 발송 ({subject})",
             "결과수": 1,
-            "상태": f"To: {receiver}"
+            "상태": f"To: {receiver} ({device})"
         }])
         
         updated_df = pd.concat([existing_data, new_row], ignore_index=True)
@@ -158,7 +175,6 @@ def log_email_to_gsheets(receiver, subject):
         st.error(f"메일 로그 저장 실패: {e}")
 
 def log_copy_to_gsheets():
-    """(텍스트 복사) 기록을 저장합니다."""
     try:
         conn = st.connection("gsheets", type=GSheetsConnection)
         try:
@@ -169,12 +185,14 @@ def log_copy_to_gsheets():
             existing_data = pd.DataFrame(columns=["날짜", "시간", "검색어", "결과수", "상태"])
 
         now = datetime.datetime.now() + datetime.timedelta(hours=9)
+        device = get_device_type()
+
         new_row = pd.DataFrame([{
             "날짜": now.strftime("%Y-%m-%d"),
             "시간": now.strftime("%H:%M:%S"),
             "검색어": "📋 텍스트 복사 실행",
             "결과수": 1,
-            "상태": "클립보드 복사"
+            "상태": f"클립보드 복사 ({device})"
         }])
         
         updated_df = pd.concat([existing_data, new_row], ignore_index=True)
@@ -205,7 +223,6 @@ def send_email_gmail(sender_email, sender_pw, receiver_email, subject, content):
 
 def send_emergency_alert():
     try:
-        # Secrets에서 정보 가져오기
         sender_id = st.secrets["gmail"]["id"]
         sender_pw = st.secrets["gmail"]["pw"]
         receiver_id = "lueam1226@naver.com"
@@ -214,13 +231,7 @@ def send_emergency_alert():
         content = """
         관리자님, Totta Scriptor에서 검색 결과가 0건으로 반환되었습니다.
         네이버 뉴스 페이지의 HTML 구조가 변경되었을 가능성이 높습니다.
-        
-        조치 방법:
-        1. 크롬 개발자 도구(F12) 확인
-        2. app.py의 NewsScraper 클래스 내 선택자(selector) 점검
-        3. 'news_tit' 등의 클래스명이 변경되었는지 확인 바랍니다.
         """
-        
         send_email_gmail(sender_id, sender_pw, receiver_id, subject, content)
         return True
     except:
@@ -500,23 +511,22 @@ for key in ['corp_list', 'rel_list', 'search_results']:
 c1, c2 = st.columns([0.8, 0.2])
 
 with c1: 
-    st.markdown("<h2 style='margin-bottom:10px; padding-top:10px; font-size: 26px;'>Totta Scriptor for web</h2>", unsafe_allow_html=True)
+    st.markdown("<h3 style='margin-bottom:10px; padding-top:10px; font-size: 26px;'>🚇 Totta Scriptor for web</h3>", unsafe_allow_html=True)
 
-# [NEW] 도움말 다이얼로그 함수 (내용 업데이트됨)
+# [NEW] 도움말 다이얼로그 함수
 @st.dialog("📖 Totta Scriptor 사용 설명서")
 def help_dialog():
     st.markdown("""
     ### 1. 뉴스 검색
     * **🤖 자동 모드:** `서울교통공사`, `서울지하철`, `도시철도` 3가지 키워드로 한 번에 검색합니다.
-        * **정렬:** 공사 > 지하철 > 도시철도 순으로 중요도가 자동 정렬되며, 어떤 키워드로 검색 된건지 표시됩니다.
+        * **정렬:** 공사 > 지하철 > 도시철도 순으로 중요도가 자동 정렬됩니다.
     * **⌨️ 수동 모드:** 원하는 키워드를 직접 입력하여 검색합니다.
-    * **옵션 (🌐 자체 기사 포함):** **기본적으로 켜져 있습니다.** *
+    * **옵션 (🌐 자체 기사 포함):** **기본적으로 켜져 있습니다.** * 💡 광고성 기사를 줄이기 위해 **'서울교통공사'** 키워드로 검색된 자체 기사만 똑똑하게 골라냅니다.
 
-    ### 2. 뉴스 카드 
-    * <span style='color:#2e7d32; font-weight:bold;'>■ 초록색</span> : **네이버 뉴스** 
-    * <span style='color:#007bff; font-weight:bold;'>■ 파란색</span> : **언론사 자체 기사** 
-    (중요도가 떨어지므로 서울교통공사 키워드만 적용됩니다)
-    * <span style='color:black; font-weight:bold; background-color:#eee;'>■ 검정색</span> : **지면 기사**
+    ### 2. 뉴스 카드 색상 구분
+    * <span style='color:#2e7d32; font-weight:bold;'>■ 초록색</span> : **네이버 뉴스** (댓글/공감 확인 가능)
+    * <span style='color:#007bff; font-weight:bold;'>■ 파란색</span> : **언론사 홈페이지** (Outlink)
+    * <span style='color:black; font-weight:bold; background-color:#eee;'>■ 검정색</span> : **지면 기사** (중요도 높음)
     * <span style='color:#adb5bd; font-weight:bold;'>■ 회색</span> : 이미 스크랩 목록에 추가된 기사
 
     ### 3. 스크랩 및 기능
@@ -688,16 +698,11 @@ with st.expander("🔍 뉴스 검색 설정", expanded=True):
     if st.button("🚀 뉴스 검색 시작", type="primary", use_container_width=True):
         results = NewsScraper().fetch_news(sd, ed, search_keywords, mx, include_others)
         
-        # [NEW] 결과가 없을 때 (0건) -> 비상 상황으로 간주하여 알림 발송
         if not results:
-            # 1. 화면에 에러 표시
             st.error("검색 결과가 없습니다. (HTML 구조 변경 가능성 있음)")
             st.warning("관리자(lueam1226@naver.com)에게 점검 요청 메일을 발송했습니다.")
             
-            # 2. 비상 메일 발송
             send_emergency_alert()
-            
-            # 3. 구글 시트에 긴급 점검 로그 남기기
             log_to_gsheets(log_keyword, 0, "🟡🚨 긴급점검요망")
             
         else:
@@ -768,6 +773,3 @@ if st.session_state.search_results:
     if p_news: display_list("📰 지면 보도", p_news, "p")
     if n_news: display_list("🟢 네이버 뉴스", n_news, "n")
     if o_news: display_list("🌐 언론사 자체 뉴스", o_news, "o")
-
-
-
