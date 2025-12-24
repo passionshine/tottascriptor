@@ -67,7 +67,10 @@ if not st.session_state["logged_in"]:
             # [C] 입력 필드 및 버튼 영역
             st.text_input("비밀번호", type="password", key="password_input", on_change=check_password, placeholder="비밀번호 입력")
             
-            st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
+
+
+            
+            st.markdown("<div style='margin-top: 12px;'></div>", unsafe_allow_html=True)
             
             if st.button("로그인", use_container_width=True, type="primary"):
                 check_password()
@@ -510,6 +513,7 @@ if st.session_state.search_results:
     if p_news: display_list("📰 지면 보도", p_news, "p")
     if n_news: display_list("🟢 네이버 뉴스", n_news, "n")
     if o_news: display_list("🌐 언론사 자체 뉴스", o_news, "o")
+
 
 
 
