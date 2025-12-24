@@ -7,6 +7,7 @@ import re
 import streamlit.components.v1 as components
 import smtplib
 from email.mime.text import MIMEText
+import os # 파일 존재 여부 확인용
 
 # ==============================================================================
 # [0] 페이지 기본 설정
@@ -14,7 +15,7 @@ from email.mime.text import MIMEText
 st.set_page_config(page_title="Totta Scriptor", layout="wide", page_icon="🚇")
 
 # ==============================================================================
-# [1] 로그인(잠금) 시스템 (구글 스타일 대문 적용)
+# [1] 로그인(잠금) 시스템 (로고 파일 업로드 방식 적용)
 # ==============================================================================
 if "logged_in" not in st.session_state:
     st.session_state["logged_in"] = False
@@ -32,45 +33,46 @@ def check_password():
 
 # --- [로그인 대문 화면 시작] ---
 if not st.session_state["logged_in"]:
-    # 1. 수직 중앙 정렬을 위한 상단 여백 확보
+    # 1. 상단 여백
     st.markdown("""
         <style>
-        .login-container {
-            margin-top: 10vh; /* 화면 상단에서 10% 내려옴 */
-        }
+        .login-container { margin-top: 10vh; }
         </style>
         <div class='login-container'></div>
         """, unsafe_allow_html=True)
     
-    # 2. 수평 중앙 정렬을 위한 컬럼 분할 (좌우 여백 줌)
+    # 2. 중앙 정렬 레이아웃
     col1, col2, col3 = st.columns([1.5, 2, 1.5])
     
     with col2:
-        # 구글 스타일의 깔끔한 카드 박스
+        # 깔끔한 카드 박스
         with st.container(border=True):
-            # [A] 로고 영역 (내부 컬럼으로 중앙 정렬)
-            lc1, lc2, lc3 = st.columns([1, 3, 1])
+            # [A] 로고 영역 (업로드 파일 방식)
+            lc1, lc2, lc3 = st.columns([0.5, 3, 0.5]) # 로고 크기 조절을 위한 비율
             with lc2:
-                # 서울교통공사 공식 투명 로고 URL 사용
-                st.image("https://www.seoulmetro.co.kr/kr/images/common/logo.png", use_container_width=True)
+                # logo.png 파일이 있으면 보여주고, 없으면 텍스트로 대체
+                if os.path.exists("logo.png"):
+                    st.image("logo.png", use_container_width=True)
+                else:
+                    # 로고 파일을 아직 안 올렸을 때 보여줄 기본 텍스트
+                    st.markdown("<h1 style='text-align: center; color: #2c3e50;'>🚇 Totta Scriptor</h1>", unsafe_allow_html=True)
             
             # [B] 환영 문구 영역
             st.markdown("""
-                <div style='text-align: center; margin-bottom: 30px;'>
-                    <h2 style='color: #2c3e50; margin-bottom: 10px;'>Totta Scriptor</h2>
-                    <p style='color: #7f8c8d; font-size: 15px;'>안전한 뉴스 스크랩을 위한 공간입니다.<br>접속을 위해 비밀번호를 입력해주세요.</p>
+                <div style='text-align: center; margin-bottom: 30px; margin-top: 10px;'>
+                    <p style='color: #7f8c8d; font-size: 15px;'>서울교통공사 뉴스 스크랩을 위한 시스템입니다.<br>접속을 위해 비밀번호를 입력해주세요.</p>
                 </div>
                 """, unsafe_allow_html=True)
 
             # [C] 입력 필드 및 버튼 영역
             st.text_input("비밀번호", type="password", key="password_input", on_change=check_password, placeholder="비밀번호 입력")
             
-            st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True) # 버튼 간격
+            st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
             
             if st.button("로그인", use_container_width=True, type="primary"):
                 check_password()
                 
-            # 하단 저작권 표시 (선택사항)
+            # 하단 저작권 표시
             st.markdown("""
                 <div style='text-align: center; margin-top: 30px; color: #bdc3c7; font-size: 12px;'>
                     © 2025 Totta Scriptor. All rights reserved.
