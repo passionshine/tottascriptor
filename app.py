@@ -64,7 +64,7 @@ if not st.session_state["logged_in"]:
             
             st.markdown("""
                 <div style='text-align: center; margin-bottom: 30px; margin-top: 10px;'>
-                    <p style='color: #7f8c8d; font-size: 15px;'>안전한 뉴스 스크랩을 위한 공간입니다.<br>접속을 위해 비밀번호를 입력해주세요.</p>
+                    <p style='color: #7f8c8d; font-size: 15px;'>서울교통공사 뉴스 스크랩을 위한 시스템입니다.<br>접속을 위해 비밀번호를 입력해주세요.</p>
                 </div>
                 """, unsafe_allow_html=True)
 
@@ -77,7 +77,7 @@ if not st.session_state["logged_in"]:
                 
             st.markdown("""
                 <div style='text-align: center; margin-top: 30px; color: #bdc3c7; font-size: 12px;'>
-                    © 2025 Totta Scriptor. All rights reserved.
+                    © 2026 Totta Scriptor. All rights reserved.
                 </div>
                 """, unsafe_allow_html=True)
     st.stop()
@@ -203,7 +203,6 @@ def send_email_gmail(sender_email, sender_pw, receiver_email, subject, content):
     except Exception as e:
         return False, f"❌ 전송 실패: {e}"
 
-# [NEW] 비상 상황 알림 메일 함수
 def send_emergency_alert():
     try:
         # Secrets에서 정보 가져오기
@@ -307,7 +306,6 @@ class NewsScraper:
 
                     soup = BeautifulSoup(response.content, 'html.parser')
                     
-                    # [유지보수 포인트] 여기가 가장 중요합니다. 기사 제목을 찾는 선택자입니다.
                     items = soup.select('a[data-heatmap-target=".tit"]') or soup.select('a.news_tit')
                     if not items: break
 
@@ -504,7 +502,7 @@ c1, c2 = st.columns([0.8, 0.2])
 with c1: 
     st.markdown("<h2 style='margin-bottom:10px; padding-top:10px; font-size: 26px;'>Totta Scriptor for web</h2>", unsafe_allow_html=True)
 
-# [NEW] 도움말 다이얼로그 함수
+# [NEW] 도움말 다이얼로그 함수 (내용 업데이트됨)
 @st.dialog("📖 Totta Scriptor 사용 설명서")
 def help_dialog():
     st.markdown("""
@@ -512,8 +510,7 @@ def help_dialog():
     * **🤖 자동 모드:** `서울교통공사`, `서울지하철`, `도시철도` 3가지 키워드로 한 번에 검색합니다.
         * **정렬:** 공사 > 지하철 > 도시철도 순으로 중요도가 자동 정렬됩니다.
     * **⌨️ 수동 모드:** 원하는 키워드를 직접 입력하여 검색합니다.
-    * **옵션 (🌐 자체 기사 포함):** 체크 시 네이버 뉴스 링크가 없는 언론사 홈페이지 기사까지 수집합니다. (기본값: 포함)
-        * ⚠️ 단, 자체 기사는 **'서울교통공사' 키워드로 검색된 경우에만** 수집됩니다.
+    * **옵션 (🌐 자체 기사 포함):** **기본적으로 켜져 있습니다.** * 💡 광고성 기사를 줄이기 위해 **'서울교통공사'** 키워드로 검색된 자체 기사만 똑똑하게 골라냅니다.
 
     ### 2. 뉴스 카드 색상 구분
     * <span style='color:#2e7d32; font-weight:bold;'>■ 초록색</span> : **네이버 뉴스** (댓글/공감 확인 가능)
@@ -526,8 +523,8 @@ def help_dialog():
     * **📋 텍스트 복사:** 스크랩된 전체 내용을 클립보드에 복사합니다.
     * **📧 메일 보내기:** 메일 주소를 입력하면 결과를 바로 전송합니다.
     
-    ### 💡 팁
-    * 제목과 언론사가 동일한 중복 기사는 **자동으로 제거**됩니다.
+    ### 🛡️ 장애 대응 시스템
+    * 네이버 뉴스 페이지 구조 변경 등으로 **검색 결과가 0건**일 경우, 자동으로 관리자에게 **점검 요청 메일**이 발송됩니다.
     """, unsafe_allow_html=True)
 
 # [NEW] 우측 상단 버튼 배치 (도움말 / 로그아웃)
@@ -699,7 +696,7 @@ with st.expander("🔍 뉴스 검색 설정", expanded=True):
             # 2. 비상 메일 발송
             send_emergency_alert()
             
-            # 3. 구글 시트에 긴급 점검 로그 남기기 (노란색 강조 대신 이모지로 대체)
+            # 3. 구글 시트에 긴급 점검 로그 남기기
             log_to_gsheets(log_keyword, 0, "🟡🚨 긴급점검요망")
             
         else:
