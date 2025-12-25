@@ -412,13 +412,12 @@ st.markdown("""
         box-shadow: 0 2px 4px rgba(0,0,0,0.08); 
         margin-bottom: 15px;
     }
-
-    /* 1. 네이버 뉴스 (연한 초록) */
+    /* 1. 네이버 뉴스 (네이버 공식 컬러 적용) */
     .card-naver {
-        background: #e8f5e9 !important; 
-        border-left: 5px solid #2e7d32 !important;
+        background: #F4FBF6 !important;  /* 아주 연한 네이버 느낌 배경 */
+        border-left: 5px solid #03C75A !important; /* ★ 핵심: 네이버 공식 그린 */
     }
-    
+
     /* 2. 언론사 자체 기사 (연한 파랑) */
     .card-outlink {
         background: #f0f8ff !important; 
@@ -774,6 +773,7 @@ if st.session_state.search_results:
     if p_news: display_list("📰 지면 보도", p_news, "p")
     if n_news: display_list("🟢 네이버 뉴스", n_news, "n")
     if o_news: display_list("🌐 언론사 자체 뉴스", o_news, "o")
+
 
 
 
